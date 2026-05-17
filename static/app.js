@@ -1,0 +1,209 @@
+const chemicalInput = document.querySelector("#chemicalInput");
+const chemicalResult = document.querySelector("#chemicalResult");
+const lookupBtn = document.querySelector("#lookupBtn");
+const checklist = document.querySelector("#checklist");
+const symptomBtn = document.querySelector("#symptomBtn");
+const symptomResult = document.querySelector("#symptomResult");
+const symptomText = document.querySelector("#symptomText");
+const locationBtn = document.querySelector("#locationBtn");
+const alertBtn = document.querySelector("#alertBtn");
+const emergencyMessage = document.querySelector("#emergencyMessage");
+const contactInput = document.querySelector("#contactInput");
+const smsLink = document.querySelector("#smsLink");
+const whatsappLink = document.querySelector("#whatsappLink");
+const hospitalLink = document.querySelector("#hospitalLink");
+const chatLog = document.querySelector("#chatLog");
+const chatInput = document.querySelector("#chatInput");
+const chatBtn = document.querySelector("#chatBtn");
+
+let selectedLocation = "";
+const chatHistory = [];
+
+function dangerClass(level) {
+  if (level === "Extreme" || level === "High") return "danger";
+  if (level === "Moderate" || level === "Low to Moderate") return "warning";
+  return "safe";
+}
+
+function selectedSymptoms() {
+  const checked = [...document.querySelectorAll(".symptom-grid input:checked")].map((input) => input.value);
+  if (symptomText.value.trim()) checked.push(symptomText.value.trim());
+  return checked;
+}
+
+function renderChemical(data) {
+  if (!data.found) {
+    chemicalResult.innerHTML = `<strong>Not found.</strong> ${data.message}`;
+    return;
+  }
+
+  const chemical = data.chemical;
+  chemicalResult.innerHTML = `
+    <strong>${chemical.name}</strong>
+    <div>Category: ${chemical.category}</div>
+    <div>Danger level: <span class="${dangerClass(chemical.danger_level)}">${chemical.danger_level}</span></div>
+    <div>Common symptoms: ${chemical.symptoms.join(", ")}</div>
+    <div>First aid: ${chemical.first_aid}</div>
+    <div class="muted">${chemical.notes}</div>
+  `;
+}
+
+async function lookupChemical() {
+  const name = chemicalInput.value.trim();
+  if (!name) {
+    chemicalResult.textContent = "Enter the chemical name first.";
+    return;
+  }
+
+  const response = await fetch(`/api/chemical?name=${encodeURIComponent(name)}`);
+  const data = await response.json();
+  renderChemical(data);
+}
+
+async function loadChecklist(type = "skin") {
+  const response = await fetch(`/api/decontamination?type=${encodeURIComponent(type)}`);
+  const data = await response.json();
+  checklist.innerHTML = data.steps
+    .map((step) => `<li><strong>${step.title}</strong><span>${step.detail}</span></li>`)
+    .join("");
+}
+
+async function analyzeSymptoms() {
+  const symptoms = selectedSymptoms();
+  if (!symptoms.length) {
+    symptomResult.textContent = "Select or type at least one symptom.";
+    return;
+  }
+
+  const response = await fetch("/api/symptoms", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chemical: chemicalInput.value, symptoms }),
+  });
+  const data = await response.json();
+  const className = data.level === "Emergency" ? "danger" : data.level === "High concern" ? "warning" : "safe";
+  symptomResult.innerHTML = `
+    <strong class="${className}">${data.level}</strong>
+    <div>${data.action}</div>
+    <div class="muted">Matched symptoms: ${data.matched_symptoms.length ? data.matched_symptoms.join(", ") : "none from high-risk list"}</div>
+  `;
+}
+
+function updateMapLinks(latitude, longitude) {
+  const query = `${latitude},${longitude} nearest hospital`;
+  hospitalLink.href = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+}
+
+function useLocation() {
+  if (!navigator.geolocation) {
+    selectedLocation = "GPS not supported";
+    return;
+  }
+
+  locationBtn.textContent = "Finding location...";
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      selectedLocation = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      updateMapLinks(latitude, longitude);
+      locationBtn.textContent = "Location added";
+    },
+    () => {
+      selectedLocation = "Location permission denied";
+      locationBtn.textContent = "Use location";
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+async function createAlert() {
+  const symptoms = selectedSymptoms().join(", ") || "not provided";
+  const response = await fetch("/api/emergency-message", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chemical: chemicalInput.value || "unknown chemical",
+      symptoms,
+      location: selectedLocation || "location unavailable",
+    }),
+  });
+  const data = await response.json();
+  emergencyMessage.value = data.message;
+
+  const phone = contactInput.value.trim();
+  const encoded = encodeURIComponent(data.message);
+  smsLink.href = phone ? `sms:${phone}?body=${encoded}` : `sms:?body=${encoded}`;
+  whatsappLink.href = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  smsLink.classList.remove("disabled");
+  whatsappLink.classList.remove("disabled");
+}
+
+function addMessage(text, type) {
+  const bubble = document.createElement("div");
+  bubble.className = `${type} bubble`;
+  bubble.textContent = text;
+  chatLog.appendChild(bubble);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return bubble;
+}
+
+async function sendChat() {
+  const message = chatInput.value.trim();
+  if (!message) return;
+
+  addMessage(message, "user");
+  chatHistory.push({ role: "user", content: message });
+  chatInput.value = "";
+  chatBtn.disabled = true;
+  chatBtn.textContent = "Sending";
+  const pending = addMessage("Generating reply...", "bot");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 105000);
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        message,
+        chemical: chemicalInput.value,
+        symptoms: selectedSymptoms().join(", "),
+        history: chatHistory.slice(-8),
+      }),
+    });
+    const data = await response.json();
+    pending.textContent = data.reply || "I could not create a reply. Please enter the chemical name and symptoms again.";
+    chatHistory.push({ role: "assistant", content: pending.textContent });
+  } catch (error) {
+    pending.textContent = "The AI model is taking too long. For safety: move to fresh air, remove contaminated clothes, wash exposed skin and hair with soap and water, rinse exposed eyes for 15 minutes, and call a hospital or 1800-116-117 if symptoms are present.";
+    chatHistory.push({ role: "assistant", content: pending.textContent });
+  } finally {
+    clearTimeout(timeout);
+    chatBtn.disabled = false;
+    chatBtn.textContent = "Send";
+  }
+}
+
+lookupBtn.addEventListener("click", lookupChemical);
+chemicalInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") lookupChemical();
+});
+
+document.querySelectorAll(".segment").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".segment").forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    loadChecklist(button.dataset.exposure);
+  });
+});
+
+symptomBtn.addEventListener("click", analyzeSymptoms);
+locationBtn.addEventListener("click", useLocation);
+alertBtn.addEventListener("click", createAlert);
+chatBtn.addEventListener("click", sendChat);
+chatInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") sendChat();
+});
+
+loadChecklist();

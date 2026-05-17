@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Safe Return</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Chemical decontamination alert system</p>
+        <h1>Safe Return</h1>
+      </div>
+      <a class="helpline" href="tel:1800116117">India poison helpline: 1800-116-117</a>
+    </header>
+
+    <main class="app-shell">
+      <section class="panel identify-panel">
+        <div class="section-title">
+          <span>1</span>
+          <div>
+            <h2>Chemical Identifier</h2>
+            <p>Enter the pesticide or chemical name from the bottle, bag, or label.</p>
+          </div>
+        </div>
+        <div class="form-row">
+          <input id="chemicalInput" list="chemicalList" placeholder="Example: chlorpyrifos, paraquat, glyphosate">
+          <button id="lookupBtn">Check</button>
+        </div>
+        <datalist id="chemicalList">
+          {% for pesticide in pesticides %}
+          <option value="{{ pesticide.name }}"></option>
+          {% endfor %}
+        </datalist>
+        <div id="chemicalResult" class="result-box muted">Chemical risk details will appear here.</div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <div class="section-title">
+            <span>2</span>
+            <div>
+              <h2>Decontamination Checklist</h2>
+              <p>Choose exposure type and follow each step before entering the home.</p>
+            </div>
+          </div>
+          <div class="segmented" role="group" aria-label="Exposure type">
+            <button class="segment active" data-exposure="skin">Skin/clothes</button>
+            <button class="segment" data-exposure="eye">Eyes</button>
+            <button class="segment" data-exposure="inhalation">Breathing</button>
+          </div>
+          <ol id="checklist" class="checklist"></ol>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <span>3</span>
+            <div>
+              <h2>Symptom Checker</h2>
+              <p>Select symptoms or type your own observations.</p>
+            </div>
+          </div>
+          <div class="symptom-grid">
+            <label><input type="checkbox" value="headache"> Headache</label>
+            <label><input type="checkbox" value="vomiting"> Vomiting</label>
+            <label><input type="checkbox" value="dizziness"> Dizziness</label>
+            <label><input type="checkbox" value="eye irritation"> Eye irritation</label>
+            <label><input type="checkbox" value="breathing difficulty"> Breathing difficulty</label>
+            <label><input type="checkbox" value="sweating"> Heavy sweating</label>
+            <label><input type="checkbox" value="muscle twitching"> Muscle twitching</label>
+            <label><input type="checkbox" value="confusion"> Confusion</label>
+          </div>
+          <textarea id="symptomText" rows="3" placeholder="Other symptoms or what happened..."></textarea>
+          <button id="symptomBtn" class="wide">Analyze symptoms</button>
+          <div id="symptomResult" class="result-box muted">Symptom guidance will appear here.</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="panel emergency-panel">
+          <div class="section-title">
+            <span>4</span>
+            <div>
+              <h2>Emergency Alert</h2>
+              <p>Create a one-tap message with chemical, symptoms, and location.</p>
+            </div>
+          </div>
+          <input id="contactInput" placeholder="Emergency contact phone number">
+          <div class="button-row">
+            <button id="locationBtn" type="button">Use location</button>
+            <button id="alertBtn" type="button">Create alert</button>
+          </div>
+          <textarea id="emergencyMessage" rows="5" readonly placeholder="Emergency message will be generated here."></textarea>
+          <div class="button-row">
+            <a id="smsLink" class="button-link disabled" href="#">SMS</a>
+            <a id="whatsappLink" class="button-link disabled" href="#">WhatsApp</a>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <span>5</span>
+            <div>
+              <h2>Nearby Hospital Finder</h2>
+              <p>Open a map search for hospitals or poison support near your position.</p>
+            </div>
+          </div>
+          <div class="hospital-actions">
+            <a id="hospitalLink" class="button-link" href="https://www.google.com/maps/search/nearest+hospital" target="_blank" rel="noreferrer">Nearest hospital</a>
+            <a class="button-link secondary" href="https://www.google.com/maps/search/poison+control+center" target="_blank" rel="noreferrer">Poison control center</a>
+            <a class="button-link secondary" href="tel:1800116117">Call 1800-116-117</a>
+          </div>
+          <div class="source-note">
+            First-aid guidance follows public pesticide/chemical safety recommendations from WHO, EPA, CDC, CCOHS, and poison-control resources. Always follow the product label and local medical advice.
+          </div>
+        </article>
+      </section>
+
+      <section class="panel chat-panel">
+        <div class="section-title">
+          <span>AI</span>
+          <div>
+            <h2>Safe Return Chatbot</h2>
+            <p>Powered by your local Ollama model when Ollama is running.</p>
+          </div>
+        </div>
+        <div id="chatLog" class="chat-log">
+          <div class="bot bubble">Tell me the chemical name, how exposure happened, and symptoms. I will guide the next step.</div>
+        </div>
+        <div class="chat-form">
+          <input id="chatInput" placeholder="Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?">
+          <button id="chatBtn">Send</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

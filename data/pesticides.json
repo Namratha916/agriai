@@ -1,0 +1,302 @@
+[
+  {
+    "name": "Chlorpyrifos",
+    "aliases": ["Dursban", "Lorsban"],
+    "category": "Organophosphate insecticide",
+    "danger_level": "High",
+    "routes": ["skin", "inhalation", "ingestion", "eye"],
+    "symptoms": ["headache", "dizziness", "nausea", "vomiting", "sweating", "salivation", "pinpoint pupils", "muscle twitching", "breathing difficulty"],
+    "first_aid": "Move to fresh air, remove contaminated clothes, wash skin and hair with soap and water, rinse eyes for 15 minutes if exposed, and seek urgent medical help.",
+    "notes": "Organophosphates can affect nerves. Severe symptoms need immediate care."
+  },
+  {
+    "name": "Malathion",
+    "aliases": ["Cythion"],
+    "category": "Organophosphate insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "inhalation", "ingestion", "eye"],
+    "symptoms": ["headache", "nausea", "vomiting", "sweating", "blurred vision", "weakness", "muscle twitching"],
+    "first_aid": "Stop exposure, wash thoroughly, rinse eyes if needed, and call a doctor or poison control if symptoms occur.",
+    "notes": "Risk rises with concentrated product or repeated exposure."
+  },
+  {
+    "name": "Parathion",
+    "aliases": ["Ethyl parathion", "Methyl parathion"],
+    "category": "Organophosphate insecticide",
+    "danger_level": "Extreme",
+    "routes": ["skin", "inhalation", "ingestion", "eye"],
+    "symptoms": ["sweating", "salivation", "vomiting", "diarrhea", "pinpoint pupils", "seizure", "breathing difficulty", "unconscious"],
+    "first_aid": "This is highly dangerous. Decontaminate quickly and get emergency medical care immediately.",
+    "notes": "Very toxic organophosphate. Do not wait for symptoms."
+  },
+  {
+    "name": "Diazinon",
+    "aliases": [],
+    "category": "Organophosphate insecticide",
+    "danger_level": "High",
+    "routes": ["skin", "inhalation", "ingestion", "eye"],
+    "symptoms": ["headache", "dizziness", "vomiting", "sweating", "salivation", "blurred vision", "breathing difficulty"],
+    "first_aid": "Remove from exposure, wash skin and hair, rinse eyes, and seek medical help for any nerve-type symptoms.",
+    "notes": "Can cause cholinergic poisoning."
+  },
+  {
+    "name": "Dimethoate",
+    "aliases": ["Rogor"],
+    "category": "Organophosphate insecticide",
+    "danger_level": "High",
+    "routes": ["skin", "inhalation", "ingestion"],
+    "symptoms": ["nausea", "vomiting", "sweating", "salivation", "weakness", "muscle twitching", "breathing difficulty"],
+    "first_aid": "Remove contaminated clothing, wash skin, move to fresh air, and call poison control or emergency care.",
+    "notes": "Common agricultural organophosphate."
+  },
+  {
+    "name": "Monocrotophos",
+    "aliases": [],
+    "category": "Organophosphate insecticide",
+    "danger_level": "Extreme",
+    "routes": ["skin", "inhalation", "ingestion"],
+    "symptoms": ["vomiting", "sweating", "salivation", "pinpoint pupils", "seizure", "breathing difficulty", "unconscious"],
+    "first_aid": "Treat as an emergency. Decontaminate and go to hospital immediately with the label.",
+    "notes": "Highly hazardous pesticide."
+  },
+  {
+    "name": "Carbaryl",
+    "aliases": ["Sevin"],
+    "category": "Carbamate insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "inhalation", "ingestion", "eye"],
+    "symptoms": ["headache", "nausea", "vomiting", "sweating", "blurred vision", "weakness"],
+    "first_aid": "Wash exposed skin, rinse eyes, move to fresh air, and seek care if symptoms continue.",
+    "notes": "Carbamates can cause symptoms similar to organophosphates."
+  },
+  {
+    "name": "Carbofuran",
+    "aliases": ["Furadan"],
+    "category": "Carbamate insecticide",
+    "danger_level": "Extreme",
+    "routes": ["skin", "inhalation", "ingestion"],
+    "symptoms": ["vomiting", "sweating", "salivation", "muscle twitching", "seizure", "breathing difficulty"],
+    "first_aid": "Emergency medical care is needed. Remove contaminated clothing and wash exposed skin immediately.",
+    "notes": "Highly toxic carbamate."
+  },
+  {
+    "name": "Methomyl",
+    "aliases": ["Lannate"],
+    "category": "Carbamate insecticide",
+    "danger_level": "High",
+    "routes": ["skin", "inhalation", "ingestion"],
+    "symptoms": ["headache", "vomiting", "sweating", "salivation", "muscle twitching", "breathing difficulty"],
+    "first_aid": "Decontaminate and get medical help if any symptoms occur.",
+    "notes": "Rapid onset symptoms are possible."
+  },
+  {
+    "name": "Cypermethrin",
+    "aliases": [],
+    "category": "Pyrethroid insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "inhalation", "eye"],
+    "symptoms": ["skin burning", "tingling", "eye irritation", "cough", "dizziness", "nausea"],
+    "first_aid": "Wash skin with soap and water. Rinse eyes for 15 minutes. Move to fresh air if spray was inhaled.",
+    "notes": "Often causes skin tingling or burning sensations."
+  },
+  {
+    "name": "Permethrin",
+    "aliases": [],
+    "category": "Pyrethroid insecticide",
+    "danger_level": "Low to Moderate",
+    "routes": ["skin", "eye", "inhalation"],
+    "symptoms": ["skin burning", "tingling", "rash", "eye irritation", "cough"],
+    "first_aid": "Remove contaminated clothing and wash exposed skin. Rinse eyes if exposed.",
+    "notes": "Concentrates can irritate skin and eyes."
+  },
+  {
+    "name": "Deltamethrin",
+    "aliases": [],
+    "category": "Pyrethroid insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "inhalation"],
+    "symptoms": ["tingling", "skin burning", "nausea", "dizziness", "eye irritation"],
+    "first_aid": "Wash skin and hair. Rinse eyes with water. Seek help if symptoms are severe.",
+    "notes": "Avoid scrubbing irritated skin."
+  },
+  {
+    "name": "Imidacloprid",
+    "aliases": ["Confidor"],
+    "category": "Neonicotinoid insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "ingestion", "eye"],
+    "symptoms": ["nausea", "vomiting", "dizziness", "weakness", "eye irritation"],
+    "first_aid": "Wash exposed areas and call poison control if swallowed or if symptoms appear.",
+    "notes": "Bring the product label to medical care."
+  },
+  {
+    "name": "Acetamiprid",
+    "aliases": [],
+    "category": "Neonicotinoid insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "ingestion", "eye"],
+    "symptoms": ["nausea", "vomiting", "dizziness", "headache", "eye irritation"],
+    "first_aid": "Stop exposure, wash, rinse eyes, and seek medical advice for persistent symptoms.",
+    "notes": "Follow label precautions closely."
+  },
+  {
+    "name": "Glyphosate",
+    "aliases": ["Roundup"],
+    "category": "Herbicide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "ingestion"],
+    "symptoms": ["skin irritation", "eye irritation", "nausea", "vomiting", "throat irritation"],
+    "first_aid": "Wash skin, rinse eyes for 15 minutes, and get medical help if swallowed or symptoms continue.",
+    "notes": "Formulations vary; surfactants can increase irritation."
+  },
+  {
+    "name": "Paraquat",
+    "aliases": ["Gramoxone"],
+    "category": "Herbicide",
+    "danger_level": "Extreme",
+    "routes": ["ingestion", "skin", "inhalation", "eye"],
+    "symptoms": ["mouth burning", "throat pain", "vomiting", "abdominal pain", "breathing difficulty", "chest pain"],
+    "first_aid": "Emergency. Do not induce vomiting. Remove contaminated clothes, wash skin, and go to hospital immediately.",
+    "notes": "Paraquat can be fatal, especially if swallowed."
+  },
+  {
+    "name": "2,4-D",
+    "aliases": ["2 4 D", "Dichlorophenoxyacetic acid"],
+    "category": "Herbicide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "ingestion", "inhalation"],
+    "symptoms": ["skin irritation", "eye irritation", "headache", "nausea", "vomiting", "weakness"],
+    "first_aid": "Wash skin, rinse eyes, move to fresh air, and seek advice if swallowed or symptomatic.",
+    "notes": "Avoid repeated skin contact."
+  },
+  {
+    "name": "Atrazine",
+    "aliases": [],
+    "category": "Herbicide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "inhalation", "ingestion"],
+    "symptoms": ["skin irritation", "eye irritation", "cough", "nausea", "headache"],
+    "first_aid": "Wash exposed skin and rinse eyes. Seek help if symptoms persist.",
+    "notes": "Use PPE during mixing and spraying."
+  },
+  {
+    "name": "Mancozeb",
+    "aliases": ["Dithane"],
+    "category": "Fungicide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "inhalation"],
+    "symptoms": ["skin irritation", "rash", "eye irritation", "cough", "throat irritation"],
+    "first_aid": "Remove contaminated clothing, wash skin, rinse eyes, and move to fresh air.",
+    "notes": "Dust can irritate airways."
+  },
+  {
+    "name": "Copper sulfate",
+    "aliases": ["Cupric sulfate"],
+    "category": "Fungicide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "ingestion"],
+    "symptoms": ["eye irritation", "skin irritation", "nausea", "vomiting", "abdominal pain"],
+    "first_aid": "Rinse eyes, wash skin, and seek medical help if swallowed.",
+    "notes": "Can be corrosive in concentrated forms."
+  },
+  {
+    "name": "Sulfur",
+    "aliases": [],
+    "category": "Fungicide",
+    "danger_level": "Low to Moderate",
+    "routes": ["skin", "eye", "inhalation"],
+    "symptoms": ["skin irritation", "eye irritation", "cough", "throat irritation"],
+    "first_aid": "Wash skin, rinse eyes, and move to fresh air.",
+    "notes": "Dust exposure is a common irritation risk."
+  },
+  {
+    "name": "Captan",
+    "aliases": [],
+    "category": "Fungicide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "inhalation"],
+    "symptoms": ["skin irritation", "rash", "eye irritation", "cough"],
+    "first_aid": "Wash exposed skin and rinse eyes with clean water.",
+    "notes": "May irritate skin and mucous membranes."
+  },
+  {
+    "name": "Aluminium phosphide",
+    "aliases": ["Aluminum phosphide", "Celphos"],
+    "category": "Fumigant",
+    "danger_level": "Extreme",
+    "routes": ["inhalation", "ingestion"],
+    "symptoms": ["nausea", "vomiting", "chest pain", "breathing difficulty", "dizziness", "collapse"],
+    "first_aid": "Emergency. Move to fresh air only if safe and call emergency medical help immediately.",
+    "notes": "Releases phosphine gas. Do not attempt rescue without protection in enclosed spaces."
+  },
+  {
+    "name": "Zinc phosphide",
+    "aliases": [],
+    "category": "Rodenticide",
+    "danger_level": "High",
+    "routes": ["ingestion", "inhalation"],
+    "symptoms": ["nausea", "vomiting", "abdominal pain", "chest tightness", "breathing difficulty"],
+    "first_aid": "Do not induce vomiting. Get emergency medical care and carry the label.",
+    "notes": "Can release toxic phosphine gas after ingestion."
+  },
+  {
+    "name": "Brodifacoum",
+    "aliases": [],
+    "category": "Anticoagulant rodenticide",
+    "danger_level": "High",
+    "routes": ["ingestion", "skin"],
+    "symptoms": ["easy bruising", "bleeding gums", "nosebleed", "blood in urine", "weakness"],
+    "first_aid": "Wash skin if exposed and seek medical advice immediately if swallowed or bleeding occurs.",
+    "notes": "Symptoms can be delayed. Medical treatment may require vitamin K under supervision."
+  },
+  {
+    "name": "Warfarin",
+    "aliases": [],
+    "category": "Anticoagulant rodenticide",
+    "danger_level": "High",
+    "routes": ["ingestion", "skin"],
+    "symptoms": ["bruising", "bleeding", "abdominal pain", "weakness"],
+    "first_aid": "Call poison control or a doctor if swallowed. Watch for delayed bleeding.",
+    "notes": "Do not self-treat with medicine."
+  },
+  {
+    "name": "Endosulfan",
+    "aliases": [],
+    "category": "Organochlorine insecticide",
+    "danger_level": "Extreme",
+    "routes": ["skin", "inhalation", "ingestion"],
+    "symptoms": ["headache", "vomiting", "dizziness", "confusion", "seizure", "unconscious"],
+    "first_aid": "Emergency medical help is needed. Remove contaminated clothing and wash skin immediately.",
+    "notes": "Highly hazardous and banned or restricted in many places."
+  },
+  {
+    "name": "Lindane",
+    "aliases": ["Gamma-HCH"],
+    "category": "Organochlorine insecticide",
+    "danger_level": "High",
+    "routes": ["skin", "inhalation", "ingestion"],
+    "symptoms": ["headache", "dizziness", "nausea", "tremor", "seizure"],
+    "first_aid": "Wash exposed skin and seek urgent medical care for neurological symptoms.",
+    "notes": "Can affect the nervous system."
+  },
+  {
+    "name": "Fipronil",
+    "aliases": [],
+    "category": "Phenylpyrazole insecticide",
+    "danger_level": "Moderate",
+    "routes": ["skin", "eye", "ingestion"],
+    "symptoms": ["skin irritation", "eye irritation", "nausea", "vomiting", "dizziness"],
+    "first_aid": "Wash skin, rinse eyes, and get medical advice if swallowed or symptomatic.",
+    "notes": "Avoid repeated exposure."
+  },
+  {
+    "name": "Abamectin",
+    "aliases": ["Avermectin"],
+    "category": "Avermectin insecticide",
+    "danger_level": "High",
+    "routes": ["skin", "ingestion", "eye"],
+    "symptoms": ["nausea", "vomiting", "dizziness", "weakness", "tremor", "confusion"],
+    "first_aid": "Decontaminate and seek medical advice quickly if symptoms occur.",
+    "notes": "Concentrates can be dangerous."
+  }
+]
