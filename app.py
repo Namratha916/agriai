@@ -25,14 +25,16 @@ VECTOR_DIR = BASE_DIR / "vector_store"
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
-OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "90"))
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "25"))
 HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
+AI_IMAGE_EXPLANATION = os.getenv("AI_IMAGE_EXPLANATION", "0") == "1"
 
 app = Flask(__name__)
 KB = PesticideKnowledgeBase(DATA_PATH)
 OCR = OCRService(
     trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
     local_only=HF_LOCAL_ONLY,
+    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "0") == "1",
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
@@ -140,12 +142,12 @@ def translate_builtin_reply(reply: str, language: str) -> str:
         return reply
 
     translations = {
-        "Hi, I am Safe Return. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.": (
-            "ನಮಸ್ಕಾರ, ನಾನು Safe Return. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. "
+        "Hi, I am AgriAI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.": (
+            "ನಮಸ್ಕಾರ, ನಾನು AgriAI. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. "
             "ಉದಾಹರಣೆ: 'ನಾನು chlorpyrifos ಸಿಂಪಡಿಸಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ.' ನಾನು ಹಂತ ಹಂತವಾಗಿ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ."
         ),
-        "You can use Safe Return in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.": (
-            "Safe Return ಅನ್ನು ಮೂರು ಸರಳ ಹಂತಗಳಲ್ಲಿ ಬಳಸಿ: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, "
+        "You can use AgriAI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.": (
+            "AgriAI ಅನ್ನು ಮೂರು ಸರಳ ಹಂತಗಳಲ್ಲಿ ಬಳಸಿ: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, "
             "ಮತ್ತು ಡೀಕಂಟಾಮಿನೇಶನ್ ಚೆಕ್‌ಲಿಸ್ಟ್ ಅನುಸರಿಸಿ. ಲಕ್ಷಣಗಳು ಗಂಭೀರವಾಗಿದ್ದರೆ ಚಾಟ್‌ಬಾಟ್‌ಗಾಗಿ ಕಾಯದೆ emergency alert ಮತ್ತು hospital finder ಬಳಸಿ."
         ),
         "A pesticide is a chemical or natural substance used to control pests such as insects, weeds, fungi, or rodents. Farmers use pesticides to protect crops, but some pesticides can harm people if they touch the skin, get into the eyes, are breathed in, or are swallowed. That is why workers should use protective gear, wash properly after spraying, and get medical help quickly if symptoms appear.": (
@@ -280,7 +282,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
     if intent == "greeting":
         reply = (
             intent,
-            "Hi, I am Safe Return. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.",
+            "Hi, I am AgriAI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.",
         )
         return reply[0], translate_builtin_reply(reply[1], language)
 
@@ -296,7 +298,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
     if intent == "app_help":
         reply = (
             intent,
-            "You can use Safe Return in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.",
+            "You can use AgriAI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.",
         )
         return reply[0], translate_builtin_reply(reply[1], language)
 
@@ -339,9 +341,9 @@ def build_domain_info_reply(user_message: str, language: str = "en") -> str | No
 
     if "safe return" in clean_message or "this project" in clean_message:
         if language == "kn":
-            return "Safe Return ರೈತರು ಮತ್ತು spray workers‌ಗಾಗಿ chemical decontamination alert ಮತ್ತು guide system. ಇದು chemical identify ಮಾಡುವುದು, symptoms check ಮಾಡುವುದು, decontamination steps, emergency alert, nearby medical help ಮತ್ತು chatbot guidance ನೀಡುತ್ತದೆ."
+            return "AgriAI ರೈತರು ಮತ್ತು spray workers‌ಗಾಗಿ chemical decontamination alert ಮತ್ತು guide system. ಇದು chemical identify ಮಾಡುವುದು, symptoms check ಮಾಡುವುದು, decontamination steps, emergency alert, nearby medical help ಮತ್ತು chatbot guidance ನೀಡುತ್ತದೆ."
         return (
-            "Safe Return is a chemical decontamination alert and guide system for farmers and spray workers. "
+            "AgriAI is a chemical decontamination alert and guide system for farmers and spray workers. "
             "It helps users identify a chemical, check symptoms, follow decontamination steps, create an emergency alert, find nearby medical help, and chat with an assistant for guidance."
         )
 
@@ -571,21 +573,21 @@ def api_analyze_image():
     rag_context = RAG.context(f"{details['pesticide_name']} {ocr_result.text} {notes}", top_k=4)
     pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
 
-    prompt = IMAGE_ANALYSIS_PROMPT.format(
-        language=language_name(language),
-        ocr_text=ocr_result.text or "No readable text was extracted.",
-        pesticide_context=pesticide_context,
-    )
-
-    ai_reply = OLLAMA.chat(
-        [
-            {"role": "system", "content": "You are AgriAI. Create concise pesticide label safety reports only from provided OCR/database context."},
-            {"role": "user", "content": prompt},
-        ],
-        safety_mode=True,
-    )
-
     fallback_reply = format_image_report(details, ocr_result, extracted)
+    ai_reply = None
+    if AI_IMAGE_EXPLANATION:
+        prompt = IMAGE_ANALYSIS_PROMPT.format(
+            language=language_name(language),
+            ocr_text=ocr_result.text or "No readable text was extracted.",
+            pesticide_context=pesticide_context,
+        )
+        ai_reply = OLLAMA.chat(
+            [
+                {"role": "system", "content": "You are AgriAI. Create concise pesticide label safety reports only from provided OCR/database context."},
+                {"role": "user", "content": prompt},
+            ],
+            safety_mode=True,
+        )
     reply = ai_reply or fallback_reply
 
     return jsonify(
@@ -597,7 +599,7 @@ def api_analyze_image():
             "ocr_errors": ocr_result.errors[:5],
             "toxicity_level": extracted["toxicity_level"],
             "toxicity_category": extracted["toxicity_category"],
-            "model": "ocr+tesseract/easyocr/trocr+rag+ollama" if ai_reply else "ocr-rag-fallback",
+            "model": "ocr+rag+ollama" if ai_reply else "fast-ocr-rag-fallback",
         }
     )
 
@@ -634,10 +636,10 @@ def api_chat():
     domain_info_reply = build_domain_info_reply(user_message, language)
 
     if domain_info_reply and intent == "general":
-        return jsonify({"reply": domain_info_reply, "model": "safe-return-knowledge"})
+        return jsonify({"reply": domain_info_reply, "model": "agriai-knowledge"})
 
     if intent in {"greeting", "app_help"}:
-        return jsonify({"reply": safety_reply, "model": "safe-return-instant"})
+        return jsonify({"reply": safety_reply, "model": "agriai-instant"})
 
     is_safety_intent = intent in {"exposure", "exposure_question", "emergency_help"}
     urgent_safety = is_safety_intent and (
@@ -645,7 +647,7 @@ def api_chat():
         or any(symptom in normalize(f"{user_message} {symptoms}") for symptom in HIGH_RISK_SYMPTOMS)
     )
     if urgent_safety:
-        return jsonify({"reply": safety_reply, "model": "safe-return-urgent"})
+        return jsonify({"reply": safety_reply, "model": "agriai-urgent"})
 
     pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
@@ -688,7 +690,7 @@ def api_chat():
         pass
 
     if is_safety_intent:
-        return jsonify({"reply": safety_reply, "model": "safe-return-fast"})
+        return jsonify({"reply": safety_reply, "model": "agriai-fast"})
 
     return jsonify(
         {
@@ -740,7 +742,26 @@ def api_chat_stream():
         return jsonify({"error": "message is required"}), 400
 
     intent, safety_reply = build_base_reply(user_message, chemical_name, symptoms, language)
+    domain_info_reply = build_domain_info_reply(user_message, language)
     is_safety_intent = intent in {"exposure", "exposure_question", "emergency_help"}
+    urgent_safety = is_safety_intent and (
+        detect_exposure_route(f"{user_message} {symptoms}") == "ingestion"
+        or any(symptom in normalize(f"{user_message} {symptoms}") for symptom in HIGH_RISK_SYMPTOMS)
+    )
+
+    instant_reply = None
+    if domain_info_reply and intent == "general":
+        instant_reply = domain_info_reply
+    elif intent in {"greeting", "app_help"} or urgent_safety:
+        instant_reply = safety_reply
+
+    if instant_reply:
+        def instant_generate():
+            yield f"data: {json.dumps({'token': instant_reply})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return Response(instant_generate(), mimetype="text/event-stream")
+
     rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
     pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")

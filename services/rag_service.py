@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,8 @@ class RAGService:
         self.persist_dir = persist_dir
         self.documents = self._load_seed_documents()
         self._chroma = None
-        self._init_chroma()
+        if os.getenv("AGRIAI_ENABLE_CHROMA", "0") == "1":
+            self._init_chroma()
 
     def _load_seed_documents(self) -> list[dict[str, Any]]:
         with self.data_path.open("r", encoding="utf-8") as file:

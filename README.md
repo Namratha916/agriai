@@ -97,7 +97,7 @@ Because `HF_LOCAL_ONLY=1`, Hugging Face models must already be cached locally. S
 
 ## RAG Knowledge Base
 
-AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. If `chromadb` and `sentence-transformers` are available, AgriAI builds a local vector store in `vector_store/`; otherwise it uses a lightweight keyword retriever.
+AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. By default it uses a lightweight keyword retriever for low-end laptops. Set `AGRIAI_ENABLE_CHROMA=1` to enable ChromaDB + sentence-transformers local vector search.
 
 ## Voice AI
 

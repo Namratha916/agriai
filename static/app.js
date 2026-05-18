@@ -17,6 +17,7 @@ const chatInput = document.querySelector("#chatInput");
 const chatBtn = document.querySelector("#chatBtn");
 const languageSelect = document.querySelector("#languageSelect");
 const micBtn = document.querySelector("#micBtn");
+const recordBtn = document.querySelector("#recordBtn");
 const speakToggle = document.querySelector("#speakToggle");
 const voiceStatus = document.querySelector("#voiceStatus");
 const imageInput = document.querySelector("#imageInput");
@@ -28,6 +29,8 @@ const imageResult = document.querySelector("#imageResult");
 let selectedLocation = "";
 const chatHistory = [];
 let recognition = null;
+let mediaRecorder = null;
+let recordedChunks = [];
 
 function dangerClass(level) {
   if (level === "Extreme" || level === "High") return "danger";
@@ -140,12 +143,22 @@ async function createAlert() {
   const data = await response.json();
   emergencyMessage.value = data.message;
 
-  const phone = contactInput.value.trim();
+  const phone = normalizePhone(contactInput.value.trim());
   const encoded = encodeURIComponent(data.message);
-  smsLink.href = phone ? `sms:${phone}?body=${encoded}` : `sms:?body=${encoded}`;
-  whatsappLink.href = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  const smsSeparator = /iPad|iPhone|iPod/.test(navigator.userAgent) ? "&" : "?";
+  smsLink.href = phone ? `sms:${phone}${smsSeparator}body=${encoded}` : `sms:${smsSeparator}body=${encoded}`;
+  whatsappLink.href = phone ? `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}` : `https://api.whatsapp.com/send?text=${encoded}`;
+  smsLink.target = "_self";
+  whatsappLink.target = "_blank";
   smsLink.classList.remove("disabled");
   whatsappLink.classList.remove("disabled");
+}
+
+function normalizePhone(rawPhone) {
+  const digits = rawPhone.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
 }
 
 function addMessage(text, type) {
@@ -187,13 +200,14 @@ function speakText(text) {
   utterance.lang = language === "kn" || containsKannada(text) ? "kn-IN" : language === "hi" || containsDevanagari(text) ? "hi-IN" : "en-IN";
   utterance.rate = 0.95;
   window.speechSynthesis.speak(utterance);
+  voiceStatus.textContent = `Speaking in ${utterance.lang}.`;
 }
 
 function setupSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     micBtn.disabled = true;
-    voiceStatus.textContent = "Voice input is not supported in this browser.";
+    voiceStatus.textContent = "Browser voice input is not supported here. Use Record voice or type.";
     return;
   }
 
@@ -210,6 +224,7 @@ function setupSpeechRecognition() {
     const transcript = event.results[0][0].transcript;
     chatInput.value = transcript;
     voiceStatus.textContent = `Heard: ${transcript}`;
+    chatInput.focus();
   };
 
   recognition.onerror = () => {
@@ -219,6 +234,55 @@ function setupSpeechRecognition() {
   recognition.onend = () => {
     micBtn.textContent = "Voice input";
   };
+}
+
+async function toggleRecording() {
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    voiceStatus.textContent = "Recording is not supported in this browser.";
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordedChunks.push(event.data);
+    };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      recordBtn.textContent = "Record voice";
+      await transcribeRecording();
+    };
+    mediaRecorder.start();
+    recordBtn.textContent = "Stop recording";
+    voiceStatus.textContent = "Recording... speak now.";
+  } catch {
+    voiceStatus.textContent = "Microphone permission denied or unavailable.";
+  }
+}
+
+async function transcribeRecording() {
+  const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "voice.webm");
+  formData.append("language", currentLanguage());
+  voiceStatus.textContent = "Converting voice to text...";
+
+  try {
+    const response = await fetch("/api/speech-to-text", { method: "POST", body: formData });
+    const data = await response.json();
+    if (!response.ok || !data.text) throw new Error(data.error || "No text");
+    chatInput.value = data.text;
+    voiceStatus.textContent = `Heard: ${data.text}`;
+  } catch {
+    voiceStatus.textContent = "Server voice recognition is unavailable. Try browser Voice input or type.";
+  }
 }
 
 async function sendChat() {
@@ -378,9 +442,18 @@ function renderImageAnalysis(data) {
     <details>
       <summary>OCR details</summary>
       <div><b>Engines:</b> ${(data.ocr_engines || []).join(", ") || "None available"}</div>
-      <pre>${data.ocr_text || "No text extracted"}</pre>
+      <pre>${escapeHtml(data.ocr_text || "No text extracted")}</pre>
     </details>
   `;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 lookupBtn.addEventListener("click", lookupChemical);
@@ -405,6 +478,7 @@ micBtn.addEventListener("click", () => {
   recognition.lang = browserSpeechLanguage();
   recognition.start();
 });
+recordBtn.addEventListener("click", toggleRecording);
 imageInput.addEventListener("change", previewImage);
 imageAnalyzeBtn.addEventListener("click", analyzeImage);
 chatInput.addEventListener("keydown", (event) => {

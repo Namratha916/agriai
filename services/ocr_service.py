@@ -14,9 +14,15 @@ class OCRResult:
 
 
 class OCRService:
-    def __init__(self, trocr_model: str = "microsoft/trocr-base-printed", local_only: bool = True):
+    def __init__(
+        self,
+        trocr_model: str = "microsoft/trocr-base-printed",
+        local_only: bool = True,
+        enable_deep_ocr: bool = False,
+    ):
         self.trocr_model = trocr_model
         self.local_only = local_only
+        self.enable_deep_ocr = enable_deep_ocr
         self._easyocr_reader = None
         self._trocr = None
 
@@ -31,13 +37,16 @@ class OCRService:
         if tesseract_text:
             texts.append(tesseract_text)
 
-        easyocr_text = self._run_easyocr(image, result)
-        if easyocr_text:
-            texts.append(easyocr_text)
+        if self.enable_deep_ocr:
+            easyocr_text = self._run_easyocr(image, result)
+            if easyocr_text:
+                texts.append(easyocr_text)
 
-        trocr_text = self._run_trocr(image, result)
-        if trocr_text:
-            texts.append(trocr_text)
+            trocr_text = self._run_trocr(image, result)
+            if trocr_text:
+                texts.append(trocr_text)
+        else:
+            result.errors.append("deep_ocr_disabled: set AGRIAI_DEEP_OCR=1 to enable EasyOCR/TrOCR")
 
         result.text = "\n".join(dedupe_lines(texts)).strip()
         return result

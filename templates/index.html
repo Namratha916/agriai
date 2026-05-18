@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Safe Return</title>
+    <title>AgriAI</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
     <header class="topbar">
       <div>
         <p class="eyebrow">Chemical decontamination alert system</p>
-        <h1>Safe Return</h1>
+        <h1>AgriAI</h1>
       </div>
       <div class="top-actions">
         <label class="language-control">
@@ -153,7 +153,7 @@
         <div class="section-title">
           <span>AI</span>
           <div>
-            <h2>Safe Return Chatbot</h2>
+            <h2>AgriAI Chatbot</h2>
             <p>Powered by your local Ollama model when Ollama is running.</p>
           </div>
         </div>
@@ -162,6 +162,7 @@
         </div>
         <div class="voice-controls">
           <button id="micBtn" type="button">Voice input</button>
+          <button id="recordBtn" type="button">Record voice</button>
           <label class="toggle-row"><input id="speakToggle" type="checkbox" checked> Speak replies</label>
           <span id="voiceStatus" class="muted">Voice uses your browser speech tools.</span>
         </div>
