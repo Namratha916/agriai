@@ -164,19 +164,27 @@ function currentLanguage() {
 function browserSpeechLanguage() {
   const language = currentLanguage();
   if (language === "kn") return "kn-IN";
+  if (language === "hi") return "hi-IN";
   if (language === "en") return "en-IN";
-  return containsKannada(chatInput.value) ? "kn-IN" : "en-IN";
+  if (containsKannada(chatInput.value)) return "kn-IN";
+  if (containsDevanagari(chatInput.value)) return "hi-IN";
+  return "en-IN";
 }
 
 function containsKannada(text) {
   return /[\u0c80-\u0cff]/.test(text);
 }
 
+function containsDevanagari(text) {
+  return /[\u0900-\u097f]/.test(text);
+}
+
 function speakText(text) {
   if (!speakToggle.checked || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = currentLanguage() === "kn" || containsKannada(text) ? "kn-IN" : "en-IN";
+  const language = currentLanguage();
+  utterance.lang = language === "kn" || containsKannada(text) ? "kn-IN" : language === "hi" || containsDevanagari(text) ? "hi-IN" : "en-IN";
   utterance.rate = 0.95;
   window.speechSynthesis.speak(utterance);
 }
@@ -227,7 +235,7 @@ async function sendChat() {
   const timeout = setTimeout(() => controller.abort(), 105000);
 
   try {
-    const response = await fetch("/api/chat", {
+    const response = await fetch("/api/chat-stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
@@ -239,19 +247,67 @@ async function sendChat() {
         language: currentLanguage(),
       }),
     });
-    const data = await response.json();
-    pending.textContent = data.reply || "I could not create a reply. Please enter the chemical name and symptoms again.";
+    if (!response.ok || !response.body) {
+      throw new Error("stream unavailable");
+    }
+    pending.textContent = "";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      for (const event of events) {
+        const line = event.split("\n").find((item) => item.startsWith("data: "));
+        if (!line) continue;
+        const dataText = line.slice(6);
+        if (dataText === "[DONE]") continue;
+        try {
+          const data = JSON.parse(dataText);
+          pending.textContent += data.token || "";
+          chatLog.scrollTop = chatLog.scrollHeight;
+        } catch {
+          pending.textContent += dataText;
+        }
+      }
+    }
+    if (!pending.textContent.trim()) {
+      pending.textContent = "I could not create a reply. Please enter the chemical name and symptoms again.";
+    }
     chatHistory.push({ role: "assistant", content: pending.textContent });
     speakText(pending.textContent);
   } catch (error) {
-    pending.textContent = "The AI model is taking too long. For safety: move to fresh air, remove contaminated clothes, wash exposed skin and hair with soap and water, rinse exposed eyes for 15 minutes, and call a hospital or 1800-116-117 if symptoms are present.";
-    chatHistory.push({ role: "assistant", content: pending.textContent });
-    speakText(pending.textContent);
+    await sendChatFallback(message, pending);
   } finally {
     clearTimeout(timeout);
     chatBtn.disabled = false;
     chatBtn.textContent = "Send";
   }
+}
+
+async function sendChatFallback(message, pending) {
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        chemical: chemicalInput.value,
+        symptoms: selectedSymptoms().join(", "),
+        history: chatHistory.slice(-8),
+        language: currentLanguage(),
+      }),
+    });
+    const data = await response.json();
+    pending.textContent = data.reply || "I could not create a reply. Please enter the chemical name and symptoms again.";
+  } catch {
+    pending.textContent = "The AI model is unavailable. For urgent exposure: move to fresh air, remove contaminated clothes, wash exposed skin and hair with soap and water, rinse exposed eyes for 15 minutes, and call a hospital or 1800-116-117 if symptoms are present.";
+  }
+  chatHistory.push({ role: "assistant", content: pending.textContent });
+  speakText(pending.textContent);
 }
 
 function previewImage() {
@@ -285,7 +341,7 @@ async function analyzeImage() {
       body: formData,
     });
     const data = await response.json();
-    imageResult.textContent = data.reply;
+    imageResult.innerHTML = renderImageAnalysis(data);
     speakText(data.reply);
   } catch (error) {
     imageResult.textContent = "Could not analyze the image. Type the pesticide name from the label and try chemical lookup.";
@@ -293,6 +349,38 @@ async function analyzeImage() {
     imageAnalyzeBtn.disabled = false;
     imageAnalyzeBtn.textContent = "Analyze photo";
   }
+}
+
+function renderImageAnalysis(data) {
+  const details = data.details || {};
+  const toxicity = data.toxicity_level || details.harmfulness_level || "Unknown";
+  const badgeClass = toxicity === "Extreme" || toxicity === "High" ? "danger" : toxicity === "Moderate" ? "warning" : "safe";
+  const items = [
+    ["Pesticide/Product", details.pesticide_name],
+    ["Active ingredients", (details.active_ingredients || []).join(", ")],
+    ["Usage", details.usage],
+    ["Toxicity category", data.toxicity_category || details.toxicity_category],
+    ["First aid", details.first_aid],
+    ["Side effects", (details.side_effects || []).join(", ")],
+    ["Safety precautions", (details.safety_precautions || []).join("; ")],
+    ["Decontamination", (details.decontamination_steps || []).join("; ")],
+    ["Environmental impact", details.environmental_impact],
+  ];
+
+  return `
+    <div class="analysis-header">
+      <strong>Image Analysis</strong>
+      <span class="toxicity-badge ${badgeClass}">${toxicity}</span>
+    </div>
+    <div class="analysis-list">
+      ${items.map(([label, value]) => `<div><b>${label}:</b> ${value || "Unknown"}</div>`).join("")}
+    </div>
+    <details>
+      <summary>OCR details</summary>
+      <div><b>Engines:</b> ${(data.ocr_engines || []).join(", ") || "None available"}</div>
+      <pre>${data.ocr_text || "No text extracted"}</pre>
+    </details>
+  `;
 }
 
 lookupBtn.addEventListener("click", lookupChemical);

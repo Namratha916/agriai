@@ -219,6 +219,40 @@ textarea {
   font-weight: 800;
 }
 
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.toxicity-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eef4f0;
+}
+
+.analysis-list {
+  display: grid;
+  gap: 8px;
+}
+
+details {
+  margin-top: 12px;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 8px;
+  background: #eef4f0;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

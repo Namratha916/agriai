@@ -1,49 +1,94 @@
 from __future__ import annotations
 
+try:
+    from langchain_core.prompts import PromptTemplate
+except Exception:
+    PromptTemplate = None
+
 
 LANGUAGE_NAMES = {
     "en": "English",
+    "hi": "Hindi",
     "kn": "Kannada",
     "auto": "the same language as the user",
 }
 
 
-def chat_system_prompt(language: str, is_safety_intent: bool) -> str:
-    reply_language = LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["auto"])
+class SimplePromptTemplate:
+    def __init__(self, template: str):
+        self.template = template
 
-    if is_safety_intent:
-        return (
-            "You are Safe Return, an offline-first ChatGPT-like assistant for farmers and chemical workers. "
-            f"Reply in {reply_language}. "
-            "Reply naturally and directly. The user may be in danger, so use the provided safety guidance as the source of truth. "
-            "Do not add unsafe medical instructions. Never tell the user to eat, drink, induce vomiting, or take medicine. "
-            "Keep hospital and poison-control advice when present. Ask one useful follow-up question only if needed."
-        )
-
-    return (
-        "You are Safe Return, a friendly offline-first ChatGPT-like assistant. "
-        f"Reply in {reply_language}. "
-        "You can answer general questions, explain this project, help with code, and chat normally. "
-        "If the user asks about pesticide or chemical exposure, switch to urgent safety guidance. "
-        "Use simple language and be helpful, natural, and concise."
-    )
+    def format(self, **kwargs: str) -> str:
+        return self.template.format(**kwargs)
 
 
-def chat_user_prompt(user_message: str, intent: str, safety_reply: str, is_safety_intent: bool) -> str:
-    if is_safety_intent:
-        return (
-            f"User message: {user_message}\n"
-            f"Detected intent: {intent}\n"
-            f"Safe guidance you must preserve: {safety_reply}"
-        )
-    return user_message
+def make_prompt(template: str, input_variables: list[str]):
+    if PromptTemplate is None:
+        return SimplePromptTemplate(template)
+    return PromptTemplate(input_variables=input_variables, template=template)
 
 
-def image_analysis_prompt(language: str) -> str:
-    reply_language = LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["auto"])
-    return (
-        "You are Safe Return. Analyze the pesticide label photo description and any detected text. "
-        f"Reply in {reply_language}. "
-        "Identify any pesticide name or hazard clue if visible. "
-        "Give practical next steps and tell the user to verify with the product label."
-    )
+SAFETY_RESPONSE_PROMPT = make_prompt(
+    template=(
+        "You are AgriAI, an AI pesticide safety assistant.\n"
+        "Reply in {language}. Keep the answer short, medically safe, and structured.\n\n"
+        "Use the retrieved pesticide context as ground truth. Do not invent dosage, antidotes, or home remedies.\n"
+        "Never say to eat, drink, induce vomiting, or take medicine unless a doctor/poison-control expert says so.\n\n"
+        "Provide:\n"
+        "1. Danger Level\n"
+        "2. Immediate Action\n"
+        "3. First Aid\n"
+        "4. Decontamination Steps\n"
+        "5. Hospital Recommendation\n\n"
+        "Detected Pesticide: {pesticide_name}\n"
+        "Detected Symptoms: {symptoms}\n"
+        "Exposure Route: {exposure_route}\n"
+        "Retrieved Context:\n{rag_context}\n\n"
+        "User Question: {user_message}\n"
+    ),
+    input_variables=[
+        "language",
+        "pesticide_name",
+        "symptoms",
+        "exposure_route",
+        "rag_context",
+        "user_message",
+    ],
+)
+
+
+GENERAL_CHAT_PROMPT = make_prompt(
+    template=(
+        "You are AgriAI, a farmer assistance chatbot. Reply in {language}.\n"
+        "Be concise and practical. If the user asks about pesticide exposure, tell them to use the safety flow.\n\n"
+        "Relevant Context:\n{rag_context}\n\n"
+        "User Question: {user_message}\n"
+    ),
+    input_variables=["language", "rag_context", "user_message"],
+)
+
+
+IMAGE_ANALYSIS_PROMPT = make_prompt(
+    template=(
+        "You are AgriAI. Reply in {language}. A pesticide label image was processed with OCR.\n"
+        "Create a precise safety report using the extracted details.\n\n"
+        "OCR Text:\n{ocr_text}\n\n"
+        "Matched Pesticide Data:\n{pesticide_context}\n\n"
+        "Provide:\n"
+        "- Pesticide/Product Name\n"
+        "- Active Ingredients\n"
+        "- Usage\n"
+        "- Harmfulness Level\n"
+        "- Toxicity Category\n"
+        "- Side Effects\n"
+        "- First Aid\n"
+        "- Safety Precautions\n"
+        "- Decontamination Steps\n"
+        "- Environmental Impact\n"
+    ),
+    input_variables=["language", "ocr_text", "pesticide_context"],
+)
+
+
+def language_name(language: str) -> str:
+    return LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["auto"])

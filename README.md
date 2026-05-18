@@ -1,6 +1,6 @@
-# Safe Return
+# AgriAI
 
-Safe Return is a beginner-friendly Flask prototype for farmers and pesticide workers who need quick decontamination guidance after chemical exposure.
+AgriAI is an AI-powered pesticide safety and farmer assistance platform for farmers and pesticide workers who need fast, practical guidance after chemical exposure.
 
 ## Features
 
@@ -15,6 +15,11 @@ Safe Return is a beginner-friendly Flask prototype for farmers and pesticide wor
 - English/Kannada language switching with auto language detection.
 - Browser voice input and voice output using Web Speech APIs.
 - Pesticide label photo upload with optional local Hugging Face image-to-text analysis.
+- Multi-engine OCR pipeline: image preprocessing, Tesseract OCR, EasyOCR, and Hugging Face TrOCR fallback.
+- Pesticide detail extraction: product name, active ingredients, usage, toxicity level, side effects, first aid, decontamination, and environmental impact.
+- RAG retrieval over `data/pesticides.json` and text manuals in `knowledge/`, with optional ChromaDB + sentence-transformers.
+- Optional Whisper speech-to-text and gTTS server-side text-to-speech APIs.
+- Optional Streamlit companion UI in `streamlit_app.py`.
 
 ## Run
 
@@ -32,6 +37,7 @@ Open `http://127.0.0.1:5000`.
 Install and run Ollama separately, then pull a model:
 
 ```powershell
+ollama pull phi3:mini
 ollama pull tinyllama
 ollama serve
 ```
@@ -39,41 +45,82 @@ ollama serve
 Optional environment variables:
 
 ```powershell
-$env:OLLAMA_MODEL="tinyllama"
+$env:OLLAMA_MODEL="phi3:mini"
 $env:OLLAMA_URL="http://localhost:11434/api/chat"
 $env:OLLAMA_TIMEOUT="90"
 python app.py
 ```
 
-The app first creates a chemical-aware safety answer from its pesticide database, then asks Ollama to rewrite it in natural language. If Ollama is slow, the app quickly returns the safety answer instead of waiting forever.
+Recommended low-RAM models:
+
+- `phi3:mini`: better quality on 8GB RAM systems.
+- `tinyllama`: fastest fallback, lower quality.
+- `mistral:latest`: better quality if the laptop can handle it.
+
+The app retrieves pesticide context before generation, uses compact LangChain PromptTemplates, caches Ollama replies, supports `/api/chat-stream` for streaming output, and falls back to structured safety guidance if Ollama is slow.
 
 ## Language And Voice
 
 Use the language selector in the header:
 
-- `Auto`: replies in Kannada when the user types/speaks Kannada, otherwise English.
+- `Auto`: replies in Kannada/Hindi when the user types/speaks Kannada/Hindi, otherwise English.
 - `English`: forces English replies.
+- `Hindi`: requests Hindi replies.
 - `Kannada`: asks the chatbot and built-in safety replies to use Kannada.
 
 Voice input and voice output use the browser Web Speech APIs, so they work best in browsers that support `SpeechRecognition` and `speechSynthesis`. Kannada voice support depends on the voices installed in the browser/operating system.
 
-## Hugging Face Photo Analysis
+## OCR And Hugging Face Photo Analysis
 
-The pesticide photo analyzer is offline-first. It tries to use a locally installed or cached Hugging Face image-to-text model:
+The pesticide photo analyzer is offline-first. Pipeline:
+
+```text
+Image upload
+-> PIL preprocessing
+-> Tesseract OCR
+-> EasyOCR fallback
+-> Hugging Face TrOCR fallback
+-> pesticide/active ingredient extraction
+-> RAG retrieval
+-> structured AI safety explanation
+```
 
 ```powershell
-$env:HF_IMAGE_MODEL="Salesforce/blip-image-captioning-base"
+$env:HF_OCR_MODEL="microsoft/trocr-base-printed"
 $env:HF_LOCAL_ONLY="1"
 python app.py
 ```
 
-Install optional packages only if you want local image analysis:
+Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. Python packages are listed in `requirements.txt`.
+
+Because `HF_LOCAL_ONLY=1`, Hugging Face models must already be cached locally. Set `HF_LOCAL_ONLY=0` only if you want Transformers to download models.
+
+## RAG Knowledge Base
+
+AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. If `chromadb` and `sentence-transformers` are available, AgriAI builds a local vector store in `vector_store/`; otherwise it uses a lightweight keyword retriever.
+
+## Voice AI
+
+Frontend voice input uses browser Web Speech API. Backend voice endpoints are also available:
+
+- `POST /api/speech-to-text`: accepts an uploaded audio file named `audio`, uses `openai/whisper-small` if available.
+- `POST /api/text-to-speech`: accepts JSON `{ "text": "...", "language": "en|hi|kn" }`, uses gTTS if available.
+
+Browser speech synthesis is still used as a low-memory fallback.
+
+## Streamlit
+
+Start Flask first:
 
 ```powershell
-pip install Pillow transformers torch
+python app.py
 ```
 
-Because `HF_LOCAL_ONLY=1`, the app will not download a model at runtime. If no local model is available, it still accepts the image and asks the user to type the visible pesticide name or active ingredient from the label.
+Then in another terminal:
+
+```powershell
+streamlit run streamlit_app.py
+```
 
 ## Database
 

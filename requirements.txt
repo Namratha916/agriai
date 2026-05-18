@@ -1,6 +1,12 @@
 Flask==3.0.3
 requests==2.32.3
-# Optional for offline pesticide photo analysis when models are already installed/cached:
-# Pillow
-# transformers
-# torch
+Pillow>=10.0.0
+pytesseract>=0.3.13
+easyocr>=1.7.1
+transformers>=4.44.0
+torch>=2.2.0
+sentence-transformers>=3.0.0
+chromadb>=0.5.0
+langchain-core>=0.2.0
+gTTS>=2.5.0
+streamlit>=1.37.0

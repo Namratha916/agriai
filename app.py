@@ -8,22 +8,34 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
-from prompt_templates import chat_system_prompt, chat_user_prompt
+from prompt_templates import GENERAL_CHAT_PROMPT, IMAGE_ANALYSIS_PROMPT, SAFETY_RESPONSE_PROMPT, language_name
+from services.ocr_service import OCRService
+from services.ollama_service import OllamaClient
+from services.pesticide_service import PesticideKnowledgeBase
+from services.rag_service import RAGService
+from services.voice_service import speech_to_text, text_to_speech_base64
 
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_PATH = BASE_DIR / "data" / "pesticides.json"
+DOCS_DIR = BASE_DIR / "knowledge"
+VECTOR_DIR = BASE_DIR / "vector_store"
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "90"))
-HF_IMAGE_MODEL = os.getenv("HF_IMAGE_MODEL", "Salesforce/blip-image-captioning-base")
 HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
 
 app = Flask(__name__)
-_IMAGE_PIPELINE = None
+KB = PesticideKnowledgeBase(DATA_PATH)
+OCR = OCRService(
+    trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
+    local_only=HF_LOCAL_ONLY,
+)
+RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
+OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
 
 
 def load_pesticides() -> list[dict[str, Any]]:
@@ -31,7 +43,7 @@ def load_pesticides() -> list[dict[str, Any]]:
         return json.load(file)
 
 
-PESTICIDES = load_pesticides()
+PESTICIDES = KB.pesticides
 PESTICIDE_INDEX = {
     alias.lower(): pesticide
     for pesticide in PESTICIDES
@@ -108,11 +120,19 @@ def contains_kannada(text: str) -> bool:
     return any("\u0c80" <= char <= "\u0cff" for char in text)
 
 
+def contains_devanagari(text: str) -> bool:
+    return any("\u0900" <= char <= "\u097f" for char in text)
+
+
 def resolve_language(requested_language: str, *texts: str) -> str:
-    if requested_language in {"en", "kn"}:
+    if requested_language in {"en", "hi", "kn"}:
         return requested_language
     joined = " ".join(texts)
-    return "kn" if contains_kannada(joined) else "en"
+    if contains_kannada(joined):
+        return "kn"
+    if contains_devanagari(joined):
+        return "hi"
+    return "en"
 
 
 def translate_builtin_reply(reply: str, language: str) -> str:
@@ -532,24 +552,6 @@ def api_emergency_message():
     return jsonify({"message": message})
 
 
-def get_image_pipeline():
-    global _IMAGE_PIPELINE
-    if _IMAGE_PIPELINE is not None:
-        return _IMAGE_PIPELINE
-
-    try:
-        from transformers import pipeline
-
-        _IMAGE_PIPELINE = pipeline(
-            "image-to-text",
-            model=HF_IMAGE_MODEL,
-            local_files_only=HF_LOCAL_ONLY,
-        )
-        return _IMAGE_PIPELINE
-    except Exception:
-        return None
-
-
 @app.post("/api/analyze-image")
 def api_analyze_image():
     uploaded_file = request.files.get("image")
@@ -560,50 +562,60 @@ def api_analyze_image():
         return jsonify({"reply": "Upload a pesticide label photo first.", "model": "no-image"}), 400
 
     image_bytes = uploaded_file.read()
-    image_description = ""
-    hf_status = "not-available"
+    if not image_bytes:
+        return jsonify({"reply": "The uploaded image file is empty.", "model": "empty-image"}), 400
 
-    pipeline_model = get_image_pipeline()
-    if pipeline_model is not None:
-        try:
-            from PIL import Image
-            from io import BytesIO
+    ocr_result = OCR.analyze(image_bytes)
+    extracted = KB.identify_from_ocr(ocr_result.text, uploaded_file.filename, notes)
+    details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"])
+    rag_context = RAG.context(f"{details['pesticide_name']} {ocr_result.text} {notes}", top_k=4)
+    pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
 
-            image = Image.open(BytesIO(image_bytes)).convert("RGB")
-            result = pipeline_model(image)
-            image_description = result[0].get("generated_text", "") if result else ""
-            hf_status = HF_IMAGE_MODEL
-        except Exception:
-            image_description = ""
-            hf_status = "failed"
+    prompt = IMAGE_ANALYSIS_PROMPT.format(
+        language=language_name(language),
+        ocr_text=ocr_result.text or "No readable text was extracted.",
+        pesticide_context=pesticide_context,
+    )
 
-    combined_text = f"{uploaded_file.filename} {notes} {image_description}"
-    pesticide = find_pesticide_in_text(combined_text) or find_chemical_group(combined_text)
+    ai_reply = OLLAMA.chat(
+        [
+            {"role": "system", "content": "You are AgriAI. Create concise pesticide label safety reports only from provided OCR/database context."},
+            {"role": "user", "content": prompt},
+        ],
+        safety_mode=True,
+    )
 
-    if pesticide:
-        base_reply = (
-            f"I found a possible match: {pesticide['name']}. Danger level: {pesticide.get('danger_level', 'Unknown')}. "
-            f"Common warning symptoms: {', '.join(pesticide.get('symptoms', [])[:8])}. "
-            f"First aid: {pesticide.get('first_aid', 'Follow the product label and seek medical help if symptoms appear.')}"
-        )
-    elif image_description:
-        base_reply = (
-            f"The local Hugging Face image model described the photo as: {image_description}. "
-            "I could not confidently identify the pesticide name from the photo. Please type the product name or active ingredient from the label."
-        )
-    else:
-        base_reply = (
-            "I received the photo, but no local Hugging Face vision model is available or cached on this computer. "
-            "For offline image analysis, install/cache a Hugging Face image-to-text model, or type the pesticide label name in the chemical box."
-        )
+    fallback_reply = format_image_report(details, ocr_result, extracted)
+    reply = ai_reply or fallback_reply
 
-    if language == "kn":
-        base_reply = (
-            "ಚಿತ್ರವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಿದೆ. " + base_reply +
-            " ದಯವಿಟ್ಟು label‌ನಲ್ಲಿರುವ product name ಅಥವಾ active ingredient ಅನ್ನು chemical box ನಲ್ಲಿ type ಮಾಡಿ."
-        )
+    return jsonify(
+        {
+            "reply": reply,
+            "details": details,
+            "ocr_text": ocr_result.text,
+            "ocr_engines": ocr_result.engines_used,
+            "ocr_errors": ocr_result.errors[:5],
+            "toxicity_level": extracted["toxicity_level"],
+            "toxicity_category": extracted["toxicity_category"],
+            "model": "ocr+tesseract/easyocr/trocr+rag+ollama" if ai_reply else "ocr-rag-fallback",
+        }
+    )
 
-    return jsonify({"reply": base_reply, "model": hf_status})
+
+def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any]) -> str:
+    return (
+        f"Pesticide/Product Name: {details['pesticide_name']}\n"
+        f"Active Ingredients: {', '.join(details['active_ingredients']) or 'Unknown'}\n"
+        f"Usage: {details['usage']}\n"
+        f"Harmfulness Level: {extracted['toxicity_level']}\n"
+        f"Toxicity Category: {extracted['toxicity_category']}\n"
+        f"Side Effects: {', '.join(details['side_effects']) or 'Unknown'}\n"
+        f"First Aid: {details['first_aid']}\n"
+        f"Safety Precautions: {'; '.join(details['safety_precautions'])}\n"
+        f"Decontamination Steps: {'; '.join(details['decontamination_steps'])}\n"
+        f"Environmental Impact: {details['environmental_impact']}\n"
+        f"OCR Engines Used: {', '.join(ocr_result.engines_used) or 'None available'}"
+    )
 
 
 @app.post("/api/chat")
@@ -635,18 +647,28 @@ def api_chat():
     if urgent_safety:
         return jsonify({"reply": safety_reply, "model": "safe-return-urgent"})
 
-    ollama_options = {
-        "num_predict": 110 if is_safety_intent else 180,
-        "num_ctx": 1400,
-        "temperature": 0.2 if is_safety_intent else 0.7,
-        "top_p": 0.85,
-    }
+    pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
+    pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
+    exposure_route = detect_exposure_route(f"{user_message} {symptoms}") or "Unknown"
+    rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
+
     if is_safety_intent:
-        system_prompt = chat_system_prompt(language, True)
-        user_content = chat_user_prompt(user_message, intent, safety_reply, True)
+        system_prompt = "You are AgriAI. Give short, medically safe pesticide guidance grounded in retrieved context."
+        user_content = SAFETY_RESPONSE_PROMPT.format(
+            language=language_name(language),
+            pesticide_name=pesticide_name,
+            symptoms=symptoms or ", ".join(extract_symptoms(user_message)) or "Not provided",
+            exposure_route=exposure_route,
+            rag_context=rag_context or safety_reply,
+            user_message=user_message,
+        )
     else:
-        system_prompt = chat_system_prompt(language, False)
-        user_content = chat_user_prompt(user_message, intent, safety_reply, False)
+        system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
+        user_content = GENERAL_CHAT_PROMPT.format(
+            language=language_name(language),
+            rag_context=rag_context or "No specific pesticide context retrieved.",
+            user_message=user_message,
+        )
 
     messages = [{"role": "system", "content": system_prompt}]
     if isinstance(history, list):
@@ -658,24 +680,11 @@ def api_chat():
     messages.append({"role": "user", "content": user_content})
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "keep_alive": "10m",
-                "options": ollama_options,
-                "messages": messages,
-            },
-            timeout=OLLAMA_TIMEOUT,
-        )
-        response.raise_for_status()
-        data = response.json()
-        reply = data.get("message", {}).get("content", "").strip()
+        reply = OLLAMA.chat(messages, safety_mode=is_safety_intent)
         unsafe_additions = ("eat", "food", "drink water", "induce vomiting", "take medicine")
         if reply and (not is_safety_intent or not any(term in reply.lower() for term in unsafe_additions)):
-            return jsonify({"reply": reply, "model": OLLAMA_MODEL})
-    except requests.RequestException:
+            return jsonify({"reply": reply, "model": OLLAMA_MODEL, "rag_context_used": bool(rag_context)})
+    except Exception:
         pass
 
     if is_safety_intent:
@@ -692,21 +701,106 @@ def api_chat():
     )
 
 
-def warm_ollama_model() -> None:
-    try:
-        requests.post(
-            OLLAMA_URL,
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "keep_alive": "10m",
-                "options": {"num_predict": 8, "num_ctx": 512},
-                "messages": [{"role": "user", "content": "Say ready."}],
-            },
-            timeout=60,
+@app.post("/api/speech-to-text")
+def api_speech_to_text():
+    audio = request.files.get("audio")
+    language = request.form.get("language", "auto")
+    if audio is None:
+        return jsonify({"error": "Upload an audio file named audio."}), 400
+
+    text = speech_to_text(audio.read(), language)
+    if not text:
+        return jsonify({"error": "Speech recognition model is unavailable. Use browser voice input or install/cache Whisper."}), 503
+    detected_language = resolve_language(language, text)
+    return jsonify({"text": text, "language": detected_language, "model": "openai/whisper-small"})
+
+
+@app.post("/api/text-to-speech")
+def api_text_to_speech():
+    payload = request.get_json(silent=True) or {}
+    text = str(payload.get("text", "")).strip()
+    language = resolve_language(str(payload.get("language", "auto")), text)
+    if not text:
+        return jsonify({"error": "Text is required."}), 400
+
+    audio_base64 = text_to_speech_base64(text, language)
+    if not audio_base64:
+        return jsonify({"error": "Server TTS is unavailable. Browser speech synthesis can still speak replies."}), 503
+    return jsonify({"audio_base64": audio_base64, "mime_type": "audio/mpeg", "language": language})
+
+
+@app.post("/api/chat-stream")
+def api_chat_stream():
+    payload = request.get_json(silent=True) or {}
+    user_message = str(payload.get("message", "")).strip()
+    symptoms = str(payload.get("symptoms", "")).strip()
+    chemical_name = str(payload.get("chemical", "")).strip()
+    language = resolve_language(str(payload.get("language", "auto")), user_message, symptoms)
+    if not user_message:
+        return jsonify({"error": "message is required"}), 400
+
+    intent, safety_reply = build_base_reply(user_message, chemical_name, symptoms, language)
+    is_safety_intent = intent in {"exposure", "exposure_question", "emergency_help"}
+    rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
+    pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
+    pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
+
+    if is_safety_intent:
+        prompt = SAFETY_RESPONSE_PROMPT.format(
+            language=language_name(language),
+            pesticide_name=pesticide_name,
+            symptoms=symptoms or ", ".join(extract_symptoms(user_message)) or "Not provided",
+            exposure_route=detect_exposure_route(f"{user_message} {symptoms}") or "Unknown",
+            rag_context=rag_context or safety_reply,
+            user_message=user_message,
         )
-    except requests.RequestException:
-        pass
+        system_prompt = "You are AgriAI. Stream concise, medically safe pesticide guidance."
+    else:
+        prompt = GENERAL_CHAT_PROMPT.format(
+            language=language_name(language),
+            rag_context=rag_context or "No specific pesticide context retrieved.",
+            user_message=user_message,
+        )
+        system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
+
+    def generate():
+        try:
+            with requests.post(
+                OLLAMA_URL,
+                json={
+                    "model": OLLAMA_MODEL,
+                    "stream": True,
+                    "keep_alive": "10m",
+                    "options": {"num_predict": 140, "num_ctx": 1400, "temperature": 0.2 if is_safety_intent else 0.55},
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                },
+                stream=True,
+                timeout=OLLAMA_TIMEOUT,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line.decode("utf-8"))
+                        content = chunk.get("message", {}).get("content", "")
+                        if content:
+                            yield f"data: {json.dumps({'token': content})}\n\n"
+                    except Exception:
+                        continue
+        except Exception:
+            fallback = safety_reply if is_safety_intent else "AgriAI could not stream from Ollama right now."
+            yield f"data: {json.dumps({'token': fallback})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
+
+
+def warm_ollama_model() -> None:
+    OLLAMA.warm()
 
 
 if __name__ == "__main__":
