@@ -10,7 +10,11 @@ Safe Return is a beginner-friendly Flask prototype for farmers and pesticide wor
 - Symptom checker that flags emergency and high-concern patterns.
 - Emergency alert message builder with optional GPS location.
 - Nearby hospital and poison-control map links.
-- Ollama-powered chatbot endpoint for contextual GenAI replies.
+- Offline-first Ollama chatbot endpoint for contextual GenAI replies.
+- Prompt-template based chat behavior in `prompt_templates.py`.
+- English/Kannada language switching with auto language detection.
+- Browser voice input and voice output using Web Speech APIs.
+- Pesticide label photo upload with optional local Hugging Face image-to-text analysis.
 
 ## Run
 
@@ -42,6 +46,34 @@ python app.py
 ```
 
 The app first creates a chemical-aware safety answer from its pesticide database, then asks Ollama to rewrite it in natural language. If Ollama is slow, the app quickly returns the safety answer instead of waiting forever.
+
+## Language And Voice
+
+Use the language selector in the header:
+
+- `Auto`: replies in Kannada when the user types/speaks Kannada, otherwise English.
+- `English`: forces English replies.
+- `Kannada`: asks the chatbot and built-in safety replies to use Kannada.
+
+Voice input and voice output use the browser Web Speech APIs, so they work best in browsers that support `SpeechRecognition` and `speechSynthesis`. Kannada voice support depends on the voices installed in the browser/operating system.
+
+## Hugging Face Photo Analysis
+
+The pesticide photo analyzer is offline-first. It tries to use a locally installed or cached Hugging Face image-to-text model:
+
+```powershell
+$env:HF_IMAGE_MODEL="Salesforce/blip-image-captioning-base"
+$env:HF_LOCAL_ONLY="1"
+python app.py
+```
+
+Install optional packages only if you want local image analysis:
+
+```powershell
+pip install Pillow transformers torch
+```
+
+Because `HF_LOCAL_ONLY=1`, the app will not download a model at runtime. If no local model is available, it still accepts the image and asks the user to type the visible pesticide name or active ingredient from the label.
 
 ## Database
 

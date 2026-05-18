@@ -10,6 +10,8 @@ from typing import Any
 import requests
 from flask import Flask, jsonify, render_template, request
 
+from prompt_templates import chat_system_prompt, chat_user_prompt
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_PATH = BASE_DIR / "data" / "pesticides.json"
@@ -17,8 +19,11 @@ DATA_PATH = BASE_DIR / "data" / "pesticides.json"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "90"))
+HF_IMAGE_MODEL = os.getenv("HF_IMAGE_MODEL", "Salesforce/blip-image-captioning-base")
+HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
 
 app = Flask(__name__)
+_IMAGE_PIPELINE = None
 
 
 def load_pesticides() -> list[dict[str, Any]]:
@@ -97,6 +102,39 @@ CHEMICAL_GROUPS = {
 
 def normalize(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def contains_kannada(text: str) -> bool:
+    return any("\u0c80" <= char <= "\u0cff" for char in text)
+
+
+def resolve_language(requested_language: str, *texts: str) -> str:
+    if requested_language in {"en", "kn"}:
+        return requested_language
+    joined = " ".join(texts)
+    return "kn" if contains_kannada(joined) else "en"
+
+
+def translate_builtin_reply(reply: str, language: str) -> str:
+    if language != "kn":
+        return reply
+
+    translations = {
+        "Hi, I am Safe Return. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.": (
+            "ನಮಸ್ಕಾರ, ನಾನು Safe Return. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. "
+            "ಉದಾಹರಣೆ: 'ನಾನು chlorpyrifos ಸಿಂಪಡಿಸಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ.' ನಾನು ಹಂತ ಹಂತವಾಗಿ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ."
+        ),
+        "You can use Safe Return in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.": (
+            "Safe Return ಅನ್ನು ಮೂರು ಸರಳ ಹಂತಗಳಲ್ಲಿ ಬಳಸಿ: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, "
+            "ಮತ್ತು ಡೀಕಂಟಾಮಿನೇಶನ್ ಚೆಕ್‌ಲಿಸ್ಟ್ ಅನುಸರಿಸಿ. ಲಕ್ಷಣಗಳು ಗಂಭೀರವಾಗಿದ್ದರೆ ಚಾಟ್‌ಬಾಟ್‌ಗಾಗಿ ಕಾಯದೆ emergency alert ಮತ್ತು hospital finder ಬಳಸಿ."
+        ),
+        "A pesticide is a chemical or natural substance used to control pests such as insects, weeds, fungi, or rodents. Farmers use pesticides to protect crops, but some pesticides can harm people if they touch the skin, get into the eyes, are breathed in, or are swallowed. That is why workers should use protective gear, wash properly after spraying, and get medical help quickly if symptoms appear.": (
+            "ಪೆಸ್ಟಿಸೈಡ್ ಎಂದರೆ ಕೀಟಗಳು, ಕಳೆ, ಫಂಗಸ್ ಅಥವಾ ಇಲಿ ಮುಂತಾದ ಪೆಸ್ಟ್‌ಗಳನ್ನು ನಿಯಂತ್ರಿಸಲು ಬಳಸುವ ರಾಸಾಯನಿಕ ಅಥವಾ ನೈಸರ್ಗಿಕ ಪದಾರ್ಥ. "
+            "ಬೆಳೆಗಳನ್ನು ರಕ್ಷಿಸಲು ರೈತರು ಪೆಸ್ಟಿಸೈಡ್ ಬಳಸುತ್ತಾರೆ, ಆದರೆ ಅದು ಚರ್ಮಕ್ಕೆ ತಗುಲಿದರೆ, ಕಣ್ಣಿಗೆ ಹೋದರೆ, ಉಸಿರಿನಲ್ಲಿ ಹೋದರೆ ಅಥವಾ ನುಂಗಿದರೆ ಅಪಾಯವಾಗಬಹುದು. "
+            "ಆದ್ದರಿಂದ ರಕ್ಷಣಾ ಸಾಧನ ಬಳಸಿ, ಸಿಂಪಡಿಸಿದ ನಂತರ ಚೆನ್ನಾಗಿ ತೊಳೆಯಿರಿ, ಮತ್ತು ಲಕ್ಷಣಗಳು ಬಂದರೆ ವೈದ್ಯಕೀಯ ಸಹಾಯ ಪಡೆಯಿರಿ."
+        ),
+    }
+    return translations.get(reply, reply)
 
 
 def find_pesticide(query: str) -> dict[str, Any] | None:
@@ -216,58 +254,80 @@ def classify_chat_intent(user_message: str, chemical_name: str = "", symptoms_te
     return "general"
 
 
-def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: str = "") -> tuple[str, str]:
+def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: str = "", language: str = "en") -> tuple[str, str]:
     intent = classify_chat_intent(user_message, chemical_name, symptoms_text)
 
     if intent == "greeting":
-        return (
+        reply = (
             intent,
             "Hi, I am Safe Return. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.",
         )
+        return reply[0], translate_builtin_reply(reply[1], language)
 
     if intent == "emergency_help":
-        return (
+        reply = (
             intent,
             "If the person has breathing trouble, fainting, seizures, confusion, chest pain, severe vomiting, or chemical in the eyes, go to the nearest hospital now or call emergency services. In India, you can also call poison helpline 1800-116-117. Carry the chemical bottle or label.",
         )
+        if language == "kn":
+            return intent, "ಉಸಿರಾಟದ ತೊಂದರೆ, ಮೂರ್ಛೆ, fits, ಗೊಂದಲ, ಎದೆ ನೋವು, ತೀವ್ರ ವಾಂತಿ ಅಥವಾ ಕಣ್ಣಿಗೆ ರಾಸಾಯನಿಕ ಹೋದರೆ ತಕ್ಷಣ ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ ಅಥವಾ emergency services ಕರೆ ಮಾಡಿ. ಭಾರತದಲ್ಲಿ poison helpline 1800-116-117 ಕರೆ ಮಾಡಬಹುದು. ರಾಸಾಯನಿಕದ ಬಾಟಲ್ ಅಥವಾ label ತೆಗೆದುಕೊಂಡು ಹೋಗಿ."
+        return reply
 
     if intent == "app_help":
-        return (
+        reply = (
             intent,
             "You can use Safe Return in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.",
         )
+        return reply[0], translate_builtin_reply(reply[1], language)
 
     if intent == "exposure_question" and not find_pesticide(chemical_name) and not find_pesticide_in_text(user_message) and not extract_symptoms(f"{user_message} {symptoms_text}"):
-        return (
+        reply = (
             intent,
             "Please tell me the chemical name from the label and what happened: skin contact, eye splash, breathing spray, or swallowing. Also tell me symptoms such as dizziness, vomiting, headache, sweating, eye burning, or breathing difficulty.",
         )
+        if language == "kn":
+            return intent, "ದಯವಿಟ್ಟು label‌ನಲ್ಲಿರುವ ರಾಸಾಯನಿಕದ ಹೆಸರು ಮತ್ತು ಏನಾಯಿತು ಎಂದು ಹೇಳಿ: ಚರ್ಮಕ್ಕೆ ತಗುಲಿದೆಯಾ, ಕಣ್ಣಿಗೆ ಸಿಂಪಡಿದೆಯಾ, ಉಸಿರಿನಲ್ಲಿ ಹೋಯಿತಾ, ಅಥವಾ ನುಂಗಿದೀರಾ? ತಲೆ ಸುತ್ತುವುದು, ವಾಂತಿ, ತಲೆನೋವು, ಬೆವರು, ಕಣ್ಣು ಉರಿಯುವುದು ಅಥವಾ ಉಸಿರಾಟದ ತೊಂದರೆ ಇದ್ದರೆ ತಿಳಿಸಿ."
+        return reply
 
     if intent == "general":
-        return (
+        reply = (
             intent,
             "I can help with pesticide exposure, symptoms, first aid, decontamination steps, emergency messages, and hospital guidance. Tell me what happened in one sentence and include the chemical name if you know it.",
         )
+        if language == "kn":
+            return intent, "ನಾನು pesticide exposure, ಲಕ್ಷಣಗಳು, first aid, decontamination steps, emergency message ಮತ್ತು hospital guidance ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡಬಹುದು. ಏನಾಯಿತು ಎಂದು ಒಂದು ವಾಕ್ಯದಲ್ಲಿ ಹೇಳಿ, ರಾಸಾಯನಿಕದ ಹೆಸರು ಗೊತ್ತಿದ್ದರೆ ಸೇರಿಸಿ."
+        return reply
 
-    return intent, build_safety_reply(user_message, chemical_name, symptoms_text)
+    safety_reply = build_safety_reply(user_message, chemical_name, symptoms_text)
+    if language == "kn":
+        safety_reply = (
+            "ಇದು ಗಂಭೀರವಾಗಿರಬಹುದು. " + safety_reply +
+            " ದಯವಿಟ್ಟು ಈ ಮಾಹಿತಿ ಓದಿ, ಹತ್ತಿರದ ವೈದ್ಯರು ಅಥವಾ ಆಸ್ಪತ್ರೆಗೆ ತಕ್ಷಣ ಸಂಪರ್ಕಿಸಿ."
+        )
+    return intent, safety_reply
 
 
-def build_domain_info_reply(user_message: str) -> str | None:
+def build_domain_info_reply(user_message: str, language: str = "en") -> str | None:
     clean_message = normalize(user_message)
     if "what is pesticide" in clean_message or "what are pesticides" in clean_message or "define pesticide" in clean_message:
-        return (
+        reply = (
             "A pesticide is a chemical or natural substance used to control pests such as insects, weeds, fungi, or rodents. "
             "Farmers use pesticides to protect crops, but some pesticides can harm people if they touch the skin, get into the eyes, are breathed in, or are swallowed. "
             "That is why workers should use protective gear, wash properly after spraying, and get medical help quickly if symptoms appear."
         )
+        return translate_builtin_reply(reply, language)
 
     if "safe return" in clean_message or "this project" in clean_message:
+        if language == "kn":
+            return "Safe Return ರೈತರು ಮತ್ತು spray workers‌ಗಾಗಿ chemical decontamination alert ಮತ್ತು guide system. ಇದು chemical identify ಮಾಡುವುದು, symptoms check ಮಾಡುವುದು, decontamination steps, emergency alert, nearby medical help ಮತ್ತು chatbot guidance ನೀಡುತ್ತದೆ."
         return (
             "Safe Return is a chemical decontamination alert and guide system for farmers and spray workers. "
             "It helps users identify a chemical, check symptoms, follow decontamination steps, create an emergency alert, find nearby medical help, and chat with an assistant for guidance."
         )
 
     if "washing" in clean_message and "spray" in clean_message:
+        if language == "kn":
+            return "Pesticide ಸಿಂಪಡಿಸಿದ ನಂತರ ತೊಳೆಯುವುದು ಮುಖ್ಯ. ಇದು ಚರ್ಮ ಮತ್ತು ಕೂದಲಿನ ಮೇಲಿರುವ chemical residue ತೆಗೆದುಹಾಕುತ್ತದೆ ಮತ್ತು ಮನೆಗೆ pesticide ಕೊಂಡೊಯ್ಯುವುದನ್ನು ಕಡಿಮೆ ಮಾಡುತ್ತದೆ. Work clothes ಅನ್ನು family laundryಯಿಂದ ಬೇರ್ಪಡಿಸಿ."
         return (
             "Washing after spraying pesticide is important because it removes chemical residue from your skin and hair before it can keep absorbing into the body. "
             "It also prevents carrying pesticide into the home, where it could touch children, family members, food, bedding, or other clothes. "
@@ -275,6 +335,8 @@ def build_domain_info_reply(user_message: str) -> str | None:
         )
 
     if "organophosphate" in clean_message and not detect_exposure_route(clean_message):
+        if language == "kn":
+            return "Organophosphates ನರಮಂಡಲದ ಮೇಲೆ ಪರಿಣಾಮ ಬೀರುವ insecticide ಗುಂಪು. Exposure ಆದರೆ ತಲೆನೋವು, ಬೆವರು, ವಾಂತಿ, salivation, pinpoint pupils, muscle twitching, ಉಸಿರಾಟದ ತೊಂದರೆ ಅಥವಾ seizures ಬರಬಹುದು. ನುಂಗಿದ್ದರೆ ಅಥವಾ heavy exposure ಆಗಿದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಬೇಕು."
         return (
             "Organophosphates are a group of insecticides that can affect the nervous system. Exposure can cause headache, sweating, vomiting, salivation, pinpoint pupils, muscle twitching, breathing trouble, or seizures. "
             "If someone swallowed or was heavily exposed to an organophosphate, it is urgent and they should go to a hospital immediately."
@@ -470,6 +532,80 @@ def api_emergency_message():
     return jsonify({"message": message})
 
 
+def get_image_pipeline():
+    global _IMAGE_PIPELINE
+    if _IMAGE_PIPELINE is not None:
+        return _IMAGE_PIPELINE
+
+    try:
+        from transformers import pipeline
+
+        _IMAGE_PIPELINE = pipeline(
+            "image-to-text",
+            model=HF_IMAGE_MODEL,
+            local_files_only=HF_LOCAL_ONLY,
+        )
+        return _IMAGE_PIPELINE
+    except Exception:
+        return None
+
+
+@app.post("/api/analyze-image")
+def api_analyze_image():
+    uploaded_file = request.files.get("image")
+    language = resolve_language(request.form.get("language", "auto"), request.form.get("notes", ""))
+    notes = request.form.get("notes", "").strip()
+
+    if uploaded_file is None:
+        return jsonify({"reply": "Upload a pesticide label photo first.", "model": "no-image"}), 400
+
+    image_bytes = uploaded_file.read()
+    image_description = ""
+    hf_status = "not-available"
+
+    pipeline_model = get_image_pipeline()
+    if pipeline_model is not None:
+        try:
+            from PIL import Image
+            from io import BytesIO
+
+            image = Image.open(BytesIO(image_bytes)).convert("RGB")
+            result = pipeline_model(image)
+            image_description = result[0].get("generated_text", "") if result else ""
+            hf_status = HF_IMAGE_MODEL
+        except Exception:
+            image_description = ""
+            hf_status = "failed"
+
+    combined_text = f"{uploaded_file.filename} {notes} {image_description}"
+    pesticide = find_pesticide_in_text(combined_text) or find_chemical_group(combined_text)
+
+    if pesticide:
+        base_reply = (
+            f"I found a possible match: {pesticide['name']}. Danger level: {pesticide.get('danger_level', 'Unknown')}. "
+            f"Common warning symptoms: {', '.join(pesticide.get('symptoms', [])[:8])}. "
+            f"First aid: {pesticide.get('first_aid', 'Follow the product label and seek medical help if symptoms appear.')}"
+        )
+    elif image_description:
+        base_reply = (
+            f"The local Hugging Face image model described the photo as: {image_description}. "
+            "I could not confidently identify the pesticide name from the photo. Please type the product name or active ingredient from the label."
+        )
+    else:
+        base_reply = (
+            "I received the photo, but no local Hugging Face vision model is available or cached on this computer. "
+            "For offline image analysis, install/cache a Hugging Face image-to-text model, or type the pesticide label name in the chemical box."
+        )
+
+    if language == "kn":
+        base_reply = (
+            "ಚಿತ್ರವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಿದೆ. " + base_reply +
+            " ದಯವಿಟ್ಟು label‌ನಲ್ಲಿರುವ product name ಅಥವಾ active ingredient ಅನ್ನು chemical box ನಲ್ಲಿ type ಮಾಡಿ."
+        )
+
+    return jsonify({"reply": base_reply, "model": hf_status})
+
+
 @app.post("/api/chat")
 def api_chat():
     payload = request.get_json(silent=True) or {}
@@ -477,12 +613,13 @@ def api_chat():
     chemical_name = str(payload.get("chemical", "")).strip()
     symptoms = str(payload.get("symptoms", "")).strip()
     history = payload.get("history", [])
+    language = resolve_language(str(payload.get("language", "auto")), user_message, symptoms)
 
     if not user_message:
         return jsonify({"reply": "Tell me what happened, the chemical name if known, and the symptoms you are seeing."}), 400
 
-    intent, safety_reply = build_base_reply(user_message, chemical_name, symptoms)
-    domain_info_reply = build_domain_info_reply(user_message)
+    intent, safety_reply = build_base_reply(user_message, chemical_name, symptoms, language)
+    domain_info_reply = build_domain_info_reply(user_message, language)
 
     if domain_info_reply and intent == "general":
         return jsonify({"reply": domain_info_reply, "model": "safe-return-knowledge"})
@@ -505,25 +642,11 @@ def api_chat():
         "top_p": 0.85,
     }
     if is_safety_intent:
-        system_prompt = (
-            "You are Safe Return, a ChatGPT-like assistant for farmers and chemical workers. "
-            "Reply naturally and directly. The user may be in danger, so use the provided safety guidance as the source of truth. "
-            "Do not add unsafe medical instructions. Never tell the user to eat, drink, induce vomiting, or take medicine. "
-            "Keep hospital and poison-control advice when present. Ask one useful follow-up question only if needed."
-        )
-        user_content = (
-            f"User message: {user_message}\n"
-            f"Detected intent: {intent}\n"
-            f"Safe guidance you must preserve: {safety_reply}"
-        )
+        system_prompt = chat_system_prompt(language, True)
+        user_content = chat_user_prompt(user_message, intent, safety_reply, True)
     else:
-        system_prompt = (
-            "You are Safe Return, a friendly ChatGPT-like assistant. "
-            "You can answer general questions, explain this project, help with code, and chat normally. "
-            "If the user asks about pesticide or chemical exposure, switch to urgent safety guidance. "
-            "Use simple English and be helpful, natural, and concise."
-        )
-        user_content = user_message
+        system_prompt = chat_system_prompt(language, False)
+        user_content = chat_user_prompt(user_message, intent, safety_reply, False)
 
     messages = [{"role": "system", "content": system_prompt}]
     if isinstance(history, list):

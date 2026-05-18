@@ -12,7 +12,17 @@
         <p class="eyebrow">Chemical decontamination alert system</p>
         <h1>Safe Return</h1>
       </div>
-      <a class="helpline" href="tel:1800116117">India poison helpline: 1800-116-117</a>
+      <div class="top-actions">
+        <label class="language-control">
+          Language
+          <select id="languageSelect">
+            <option value="auto">Auto</option>
+            <option value="en">English</option>
+            <option value="kn">Kannada</option>
+          </select>
+        </label>
+        <a class="helpline" href="tel:1800116117">India poison helpline: 1800-116-117</a>
+      </div>
     </header>
 
     <main class="app-shell">
@@ -34,6 +44,27 @@
           {% endfor %}
         </datalist>
         <div id="chemicalResult" class="result-box muted">Chemical risk details will appear here.</div>
+      </section>
+
+      <section class="panel image-panel">
+        <div class="section-title">
+          <span>IMG</span>
+          <div>
+            <h2>Pesticide Photo Analyzer</h2>
+            <p>Upload or capture the pesticide label. Offline Hugging Face vision works when a local model is installed or cached.</p>
+          </div>
+        </div>
+        <div class="image-grid">
+          <div>
+            <input id="imageInput" type="file" accept="image/*" capture="environment">
+            <textarea id="imageNotes" rows="3" placeholder="Optional: type any label text you can read, e.g. chlorpyrifos 20% EC"></textarea>
+            <button id="imageAnalyzeBtn" class="wide" type="button">Analyze photo</button>
+          </div>
+          <div>
+            <img id="imagePreview" class="image-preview" alt="Pesticide label preview">
+            <div id="imageResult" class="result-box muted">Image analysis result will appear here.</div>
+          </div>
+        </div>
       </section>
 
       <section class="grid">
@@ -127,6 +158,11 @@
         </div>
         <div id="chatLog" class="chat-log">
           <div class="bot bubble">Tell me the chemical name, how exposure happened, and symptoms. I will guide the next step.</div>
+        </div>
+        <div class="voice-controls">
+          <button id="micBtn" type="button">Voice input</button>
+          <label class="toggle-row"><input id="speakToggle" type="checkbox" checked> Speak replies</label>
+          <span id="voiceStatus" class="muted">Voice uses your browser speech tools.</span>
         </div>
         <div class="chat-form">
           <input id="chatInput" placeholder="Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?">

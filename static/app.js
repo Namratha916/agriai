@@ -15,9 +15,19 @@ const hospitalLink = document.querySelector("#hospitalLink");
 const chatLog = document.querySelector("#chatLog");
 const chatInput = document.querySelector("#chatInput");
 const chatBtn = document.querySelector("#chatBtn");
+const languageSelect = document.querySelector("#languageSelect");
+const micBtn = document.querySelector("#micBtn");
+const speakToggle = document.querySelector("#speakToggle");
+const voiceStatus = document.querySelector("#voiceStatus");
+const imageInput = document.querySelector("#imageInput");
+const imagePreview = document.querySelector("#imagePreview");
+const imageNotes = document.querySelector("#imageNotes");
+const imageAnalyzeBtn = document.querySelector("#imageAnalyzeBtn");
+const imageResult = document.querySelector("#imageResult");
 
 let selectedLocation = "";
 const chatHistory = [];
+let recognition = null;
 
 function dangerClass(level) {
   if (level === "Extreme" || level === "High") return "danger";
@@ -147,6 +157,62 @@ function addMessage(text, type) {
   return bubble;
 }
 
+function currentLanguage() {
+  return languageSelect.value;
+}
+
+function browserSpeechLanguage() {
+  const language = currentLanguage();
+  if (language === "kn") return "kn-IN";
+  if (language === "en") return "en-IN";
+  return containsKannada(chatInput.value) ? "kn-IN" : "en-IN";
+}
+
+function containsKannada(text) {
+  return /[\u0c80-\u0cff]/.test(text);
+}
+
+function speakText(text) {
+  if (!speakToggle.checked || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = currentLanguage() === "kn" || containsKannada(text) ? "kn-IN" : "en-IN";
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
+}
+
+function setupSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    micBtn.disabled = true;
+    voiceStatus.textContent = "Voice input is not supported in this browser.";
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    micBtn.textContent = "Listening...";
+    voiceStatus.textContent = "Speak now.";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    chatInput.value = transcript;
+    voiceStatus.textContent = `Heard: ${transcript}`;
+  };
+
+  recognition.onerror = () => {
+    voiceStatus.textContent = "Voice input failed. Try typing or allow microphone access.";
+  };
+
+  recognition.onend = () => {
+    micBtn.textContent = "Voice input";
+  };
+}
+
 async function sendChat() {
   const message = chatInput.value.trim();
   if (!message) return;
@@ -170,18 +236,62 @@ async function sendChat() {
         chemical: chemicalInput.value,
         symptoms: selectedSymptoms().join(", "),
         history: chatHistory.slice(-8),
+        language: currentLanguage(),
       }),
     });
     const data = await response.json();
     pending.textContent = data.reply || "I could not create a reply. Please enter the chemical name and symptoms again.";
     chatHistory.push({ role: "assistant", content: pending.textContent });
+    speakText(pending.textContent);
   } catch (error) {
     pending.textContent = "The AI model is taking too long. For safety: move to fresh air, remove contaminated clothes, wash exposed skin and hair with soap and water, rinse exposed eyes for 15 minutes, and call a hospital or 1800-116-117 if symptoms are present.";
     chatHistory.push({ role: "assistant", content: pending.textContent });
+    speakText(pending.textContent);
   } finally {
     clearTimeout(timeout);
     chatBtn.disabled = false;
     chatBtn.textContent = "Send";
+  }
+}
+
+function previewImage() {
+  const file = imageInput.files[0];
+  if (!file) {
+    imagePreview.removeAttribute("src");
+    return;
+  }
+  imagePreview.src = URL.createObjectURL(file);
+}
+
+async function analyzeImage() {
+  const file = imageInput.files[0];
+  if (!file) {
+    imageResult.textContent = "Choose or capture a pesticide label photo first.";
+    return;
+  }
+
+  imageAnalyzeBtn.disabled = true;
+  imageAnalyzeBtn.textContent = "Analyzing";
+  imageResult.textContent = "Analyzing photo with local/offline tools...";
+
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("notes", imageNotes.value);
+  formData.append("language", currentLanguage());
+
+  try {
+    const response = await fetch("/api/analyze-image", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+    imageResult.textContent = data.reply;
+    speakText(data.reply);
+  } catch (error) {
+    imageResult.textContent = "Could not analyze the image. Type the pesticide name from the label and try chemical lookup.";
+  } finally {
+    imageAnalyzeBtn.disabled = false;
+    imageAnalyzeBtn.textContent = "Analyze photo";
   }
 }
 
@@ -202,8 +312,16 @@ symptomBtn.addEventListener("click", analyzeSymptoms);
 locationBtn.addEventListener("click", useLocation);
 alertBtn.addEventListener("click", createAlert);
 chatBtn.addEventListener("click", sendChat);
+micBtn.addEventListener("click", () => {
+  if (!recognition) return;
+  recognition.lang = browserSpeechLanguage();
+  recognition.start();
+});
+imageInput.addEventListener("change", previewImage);
+imageAnalyzeBtn.addEventListener("click", analyzeImage);
 chatInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") sendChat();
 });
 
+setupSpeechRecognition();
 loadChecklist();

@@ -1,2 +1,6 @@
 Flask==3.0.3
 requests==2.32.3
+# Optional for offline pesticide photo analysis when models are already installed/cached:
+# Pillow
+# transformers
+# torch
