@@ -61,6 +61,21 @@ class PesticideKnowledgeBase:
             if alias and (alias in clean_query or clean_query in alias):
                 return pesticide
 
+        query_tokens = set(clean_query.split())
+        best_match = None
+        best_score = 0.0
+        for alias, pesticide in self.index.items():
+            alias_tokens = set(alias.split())
+            if not alias_tokens:
+                continue
+            overlap = len(query_tokens & alias_tokens)
+            score = overlap / len(alias_tokens)
+            if overlap and score > best_score:
+                best_score = score
+                best_match = pesticide
+        if best_score >= 0.5:
+            return best_match
+
         return self.find_group(query)
 
     def find_in_text(self, text: str) -> dict[str, Any] | None:
@@ -68,6 +83,9 @@ class PesticideKnowledgeBase:
         for alias, pesticide in self.index.items():
             if alias and alias in clean_text:
                 return pesticide
+        for word in clean_text.split():
+            if len(word) >= 5 and word in self.index:
+                return self.index[word]
         return self.find_group(text)
 
     def find_group(self, text: str) -> dict[str, Any] | None:
@@ -89,9 +107,11 @@ class PesticideKnowledgeBase:
                 }
         return None
 
-    def identify_from_ocr(self, ocr_text: str, filename: str = "", notes: str = "") -> dict[str, Any]:
-        combined = f"{filename}\n{notes}\n{ocr_text}"
+    def identify_from_ocr(self, ocr_text: str, filename: str = "", notes: str = "", chemical_hint: str = "") -> dict[str, Any]:
+        combined = f"{chemical_hint}\n{filename}\n{notes}\n{ocr_text}"
         pesticide = self.find_in_text(combined)
+        if pesticide is None and chemical_hint:
+            pesticide = self.find(chemical_hint)
         active_ingredients = extract_active_ingredients(combined)
 
         if pesticide is None and active_ingredients:
@@ -108,12 +128,12 @@ class PesticideKnowledgeBase:
     def structured_details(self, pesticide: dict[str, Any] | None, active_ingredients: list[str]) -> dict[str, Any]:
         if pesticide is None:
             return {
-                "pesticide_name": "Unknown",
+                "pesticide_name": "Not detected from image",
                 "active_ingredients": active_ingredients,
-                "usage": "Unknown. Read the product label.",
-                "harmfulness_level": "Unknown",
-                "toxicity_category": "Unknown",
-                "side_effects": [],
+                "usage": "Not detected. Type the product name or active ingredient visible on the label.",
+                "harmfulness_level": "Needs label text",
+                "toxicity_category": "Needs OCR/manual label text",
+                "side_effects": ["Cannot identify exact side effects until pesticide name or active ingredient is readable."],
                 "first_aid": "If symptoms are present, contact a doctor or poison control.",
                 "safety_precautions": ["Use PPE", "Avoid skin/eye contact", "Do not inhale spray mist"],
                 "decontamination_steps": ["Remove contaminated clothes", "Wash exposed skin with soap and water"],
@@ -170,7 +190,7 @@ def toxicity_level(pesticide: dict[str, Any] | None, text: str) -> str:
         return "High"
     if "caution" in clean_text or (pesticide and "Moderate" in pesticide.get("danger_level", "")):
         return "Moderate"
-    return pesticide.get("danger_level", "Unknown") if pesticide else "Unknown"
+    return pesticide.get("danger_level", "Unknown") if pesticide else "Needs label text"
 
 
 def toxicity_category(pesticide: dict[str, Any] | None, text: str) -> str:
@@ -181,4 +201,4 @@ def toxicity_category(pesticide: dict[str, Any] | None, text: str) -> str:
         return "Moderate hazard label clue"
     if pesticide:
         return pesticide.get("toxicity_category", pesticide.get("category", "Unknown"))
-    return "Unknown"
+    return "Needs OCR/manual label text"

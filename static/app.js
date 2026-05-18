@@ -31,6 +31,219 @@ const chatHistory = [];
 let recognition = null;
 let mediaRecorder = null;
 let recordedChunks = [];
+let detectedAutoLanguage = "en";
+
+const UI_TEXT = {
+  en: {
+    eyebrow: "Chemical decontamination alert system",
+    language: "Language",
+    helpline: "India poison helpline: 1800-116-117",
+    chemicalTitle: "Chemical Identifier",
+    chemicalDesc: "Enter the pesticide or chemical name from the bottle, bag, or label.",
+    chemicalPlaceholder: "Example: chlorpyrifos, paraquat, glyphosate",
+    check: "Check",
+    chemicalResult: "Chemical risk details will appear here.",
+    imageTitle: "Pesticide Photo Analyzer",
+    imageDesc: "Upload or capture the pesticide label. Type visible label text if OCR cannot read the image.",
+    imageNotes: "Optional: type any label text you can read, e.g. chlorpyrifos 20% EC",
+    analyzePhoto: "Analyze photo",
+    imageResult: "Image analysis result will appear here.",
+    checklistTitle: "Decontamination Checklist",
+    checklistDesc: "Choose exposure type and follow each step before entering the home.",
+    skin: "Skin/clothes",
+    eyes: "Eyes",
+    breathing: "Breathing",
+    symptomsTitle: "Symptom Checker",
+    symptomsDesc: "Select symptoms or type your own observations.",
+    symptomText: "Other symptoms or what happened...",
+    analyzeSymptoms: "Analyze symptoms",
+    emergencyTitle: "Emergency Alert",
+    emergencyDesc: "Create a one-tap message with chemical, symptoms, and location.",
+    contact: "Emergency contact phone number",
+    location: "Use location",
+    createAlert: "Create alert",
+    emergencyMessage: "Emergency message will be generated here.",
+    hospitalTitle: "Nearby Hospital Finder",
+    hospitalDesc: "Open a map search for hospitals or poison support near your position.",
+    nearestHospital: "Nearest hospital",
+    poisonCenter: "Poison control center",
+    callPoison: "Call 1800-116-117",
+    chatTitle: "AgriAI Chatbot",
+    chatDesc: "Powered by your local Ollama model when Ollama is running.",
+    chatWelcome: "Tell me the chemical name, how exposure happened, and symptoms. I will guide the next step.",
+    voiceInput: "Voice input",
+    recordVoice: "Record voice",
+    speakReplies: "Speak replies",
+    voiceStatus: "Voice uses your browser speech tools.",
+    chatPlaceholder: "Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?",
+    send: "Send",
+    symptomLabels: ["Headache", "Vomiting", "Dizziness", "Eye irritation", "Breathing difficulty", "Heavy sweating", "Muscle twitching", "Confusion"],
+  },
+  hi: {
+    eyebrow: "रासायनिक डी-कंटैमिनेशन अलर्ट सिस्टम",
+    language: "भाषा",
+    helpline: "भारत poison helpline: 1800-116-117",
+    chemicalTitle: "रसायन पहचान",
+    chemicalDesc: "बोतल, बैग या label पर लिखा pesticide/chemical नाम डालें.",
+    chemicalPlaceholder: "उदाहरण: chlorpyrifos, paraquat, glyphosate",
+    check: "जांचें",
+    chemicalResult: "रसायन risk details यहां दिखेंगे.",
+    imageTitle: "Pesticide फोटो analyzer",
+    imageDesc: "Pesticide label upload/capture करें. OCR न पढ़ पाए तो visible label text type करें.",
+    imageNotes: "Optional: label पर दिख रहा text लिखें, जैसे chlorpyrifos 20% EC",
+    analyzePhoto: "फोटो analyze करें",
+    imageResult: "Image analysis result यहां दिखेगा.",
+    checklistTitle: "Decontamination checklist",
+    checklistDesc: "Exposure type चुनें और घर जाने से पहले steps follow करें.",
+    skin: "त्वचा/कपड़े",
+    eyes: "आंखें",
+    breathing: "सांस",
+    symptomsTitle: "Symptom checker",
+    symptomsDesc: "Symptoms select करें या अपनी observation type करें.",
+    symptomText: "अन्य symptoms या क्या हुआ...",
+    analyzeSymptoms: "Symptoms analyze करें",
+    emergencyTitle: "Emergency alert",
+    emergencyDesc: "Chemical, symptoms और location वाला one-tap message बनाएं.",
+    contact: "Emergency contact phone number",
+    location: "Location जोड़ें",
+    createAlert: "Alert बनाएं",
+    emergencyMessage: "Emergency message यहां बनेगा.",
+    hospitalTitle: "Nearby hospital finder",
+    hospitalDesc: "Nearby hospital या poison support map search खोलें.",
+    nearestHospital: "नजदीकी hospital",
+    poisonCenter: "Poison control center",
+    callPoison: "1800-116-117 call करें",
+    chatTitle: "AgriAI chatbot",
+    chatDesc: "Local Ollama model चल रहा हो तो उससे powered.",
+    chatWelcome: "Chemical name, exposure कैसे हुआ, और symptoms बताइए. मैं next step बताऊंगा.",
+    voiceInput: "Voice input",
+    recordVoice: "Voice record",
+    speakReplies: "Replies बोलें",
+    voiceStatus: "Voice आपके browser speech tools का उपयोग करता है.",
+    chatPlaceholder: "पूछें: मैंने chlorpyrifos spray किया और चक्कर आ रहा है, क्या करूं?",
+    send: "भेजें",
+    symptomLabels: ["सिरदर्द", "उल्टी", "चक्कर", "आंख में जलन", "सांस की दिक्कत", "ज्यादा पसीना", "मांसपेशी फड़कना", "भ्रम"],
+  },
+  kn: {
+    eyebrow: "ರಾಸಾಯನಿಕ ಡೀಕಂಟಾಮಿನೇಶನ್ ಅಲರ್ಟ್ ವ್ಯವಸ್ಥೆ",
+    language: "ಭಾಷೆ",
+    helpline: "ಭಾರತ poison helpline: 1800-116-117",
+    chemicalTitle: "ರಾಸಾಯನಿಕ ಗುರುತು",
+    chemicalDesc: "ಬಾಟಲ್, ಚೀಲ ಅಥವಾ label‌ನಲ್ಲಿರುವ pesticide/chemical ಹೆಸರನ್ನು ನಮೂದಿಸಿ.",
+    chemicalPlaceholder: "ಉದಾಹರಣೆ: chlorpyrifos, paraquat, glyphosate",
+    check: "ಪರಿಶೀಲಿಸಿ",
+    chemicalResult: "ರಾಸಾಯನಿಕ risk details ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
+    imageTitle: "Pesticide ಫೋಟೋ analyzer",
+    imageDesc: "Pesticide label upload/capture ಮಾಡಿ. OCR ಓದಲು ಆಗದಿದ್ದರೆ label text type ಮಾಡಿ.",
+    imageNotes: "Optional: label‌ನಲ್ಲಿ ಕಾಣುವ text type ಮಾಡಿ, ಉದಾ: chlorpyrifos 20% EC",
+    analyzePhoto: "ಫೋಟೋ analyze ಮಾಡಿ",
+    imageResult: "Image analysis result ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+    checklistTitle: "Decontamination checklist",
+    checklistDesc: "Exposure type ಆಯ್ಕೆ ಮಾಡಿ ಮತ್ತು ಮನೆಗೆ ಹೋಗುವ ಮೊದಲು steps follow ಮಾಡಿ.",
+    skin: "ಚರ್ಮ/ಬಟ್ಟೆ",
+    eyes: "ಕಣ್ಣುಗಳು",
+    breathing: "ಉಸಿರಾಟ",
+    symptomsTitle: "ಲಕ್ಷಣ checker",
+    symptomsDesc: "ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ ಅಥವಾ ನಿಮ್ಮ observation type ಮಾಡಿ.",
+    symptomText: "ಇತರೆ ಲಕ್ಷಣಗಳು ಅಥವಾ ಏನಾಯಿತು...",
+    analyzeSymptoms: "ಲಕ್ಷಣ analyze ಮಾಡಿ",
+    emergencyTitle: "Emergency alert",
+    emergencyDesc: "Chemical, symptoms ಮತ್ತು location ಇರುವ one-tap message ರಚಿಸಿ.",
+    contact: "Emergency contact phone number",
+    location: "Location ಬಳಸಿ",
+    createAlert: "Alert ರಚಿಸಿ",
+    emergencyMessage: "Emergency message ಇಲ್ಲಿ generate ಆಗುತ್ತದೆ.",
+    hospitalTitle: "ಹತ್ತಿರದ hospital finder",
+    hospitalDesc: "ನಿಮ್ಮ ಸ್ಥಳದ ಹತ್ತಿರ hospital ಅಥವಾ poison support map search ತೆರೆಯಿರಿ.",
+    nearestHospital: "ಹತ್ತಿರದ hospital",
+    poisonCenter: "Poison control center",
+    callPoison: "1800-116-117 ಕರೆ ಮಾಡಿ",
+    chatTitle: "AgriAI chatbot",
+    chatDesc: "Local Ollama model running ಇದ್ದರೆ ಅದರಿಂದ powered.",
+    chatWelcome: "Chemical name, exposure ಹೇಗೆ ಆಯಿತು, ಮತ್ತು symptoms ಹೇಳಿ. ನಾನು next step ಹೇಳುತ್ತೇನೆ.",
+    voiceInput: "Voice input",
+    recordVoice: "Voice record",
+    speakReplies: "Replies ಮಾತಾಡಲಿ",
+    voiceStatus: "Voice ನಿಮ್ಮ browser speech tools ಬಳಸುತ್ತದೆ.",
+    chatPlaceholder: "ಕೇಳಿ: ನಾನು chlorpyrifos spray ಮಾಡಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ, ಏನು ಮಾಡಲಿ?",
+    send: "ಕಳುಹಿಸಿ",
+    symptomLabels: ["ತಲೆನೋವು", "ವಾಂತಿ", "ತಲೆ ಸುತ್ತುವುದು", "ಕಣ್ಣು ಉರಿಯುವುದು", "ಉಸಿರಾಟದ ತೊಂದರೆ", "ಹೆಚ್ಚು ಬೆವರು", "ಮಾಂಸಖಂಡ twitching", "ಗೊಂದಲ"],
+  },
+};
+
+function uiLanguage() {
+  const selected = currentLanguage();
+  if (selected === "auto") return detectedAutoLanguage;
+  return selected;
+}
+
+function detectInputLanguage(text) {
+  if (containsKannada(text)) return "kn";
+  if (containsDevanagari(text)) return "hi";
+  return "en";
+}
+
+function updateAutoLanguageFromText(text) {
+  if (currentLanguage() !== "auto") return;
+  detectedAutoLanguage = detectInputLanguage(text);
+  applyUILanguage();
+}
+
+function applyUILanguage() {
+  const text = UI_TEXT[uiLanguage()] || UI_TEXT.en;
+  document.documentElement.lang = uiLanguage();
+  document.querySelector(".eyebrow").textContent = text.eyebrow;
+  document.querySelector(".language-control").firstChild.textContent = `${text.language} `;
+  document.querySelector(".helpline").textContent = text.helpline;
+  chemicalInput.placeholder = text.chemicalPlaceholder;
+  lookupBtn.textContent = text.check;
+  if (chemicalResult.classList.contains("muted")) chemicalResult.textContent = text.chemicalResult;
+  imageNotes.placeholder = text.imageNotes;
+  imageAnalyzeBtn.textContent = text.analyzePhoto;
+  if (imageResult.classList.contains("muted")) imageResult.textContent = text.imageResult;
+  symptomText.placeholder = text.symptomText;
+  symptomBtn.textContent = text.analyzeSymptoms;
+  contactInput.placeholder = text.contact;
+  locationBtn.textContent = text.location;
+  alertBtn.textContent = text.createAlert;
+  emergencyMessage.placeholder = text.emergencyMessage;
+  hospitalLink.textContent = text.nearestHospital;
+  document.querySelector('a[href="https://www.google.com/maps/search/poison+control+center"]').textContent = text.poisonCenter;
+  document.querySelector(".hospital-actions a[href='tel:1800116117']").textContent = text.callPoison;
+  micBtn.textContent = text.voiceInput;
+  recordBtn.textContent = text.recordVoice;
+  document.querySelector(".toggle-row").lastChild.textContent = ` ${text.speakReplies}`;
+  voiceStatus.textContent = text.voiceStatus;
+  chatInput.placeholder = text.chatPlaceholder;
+  chatBtn.textContent = text.send;
+  const headings = document.querySelectorAll("h2");
+  headings[0].textContent = text.chemicalTitle;
+  headings[1].textContent = text.imageTitle;
+  headings[2].textContent = text.checklistTitle;
+  headings[3].textContent = text.symptomsTitle;
+  headings[4].textContent = text.emergencyTitle;
+  headings[5].textContent = text.hospitalTitle;
+  headings[6].textContent = text.chatTitle;
+  const descriptions = document.querySelectorAll(".section-title p");
+  descriptions[0].textContent = text.chemicalDesc;
+  descriptions[1].textContent = text.imageDesc;
+  descriptions[2].textContent = text.checklistDesc;
+  descriptions[3].textContent = text.symptomsDesc;
+  descriptions[4].textContent = text.emergencyDesc;
+  descriptions[5].textContent = text.hospitalDesc;
+  descriptions[6].textContent = text.chatDesc;
+  document.querySelector('[data-exposure="skin"]').textContent = text.skin;
+  document.querySelector('[data-exposure="eye"]').textContent = text.eyes;
+  document.querySelector('[data-exposure="inhalation"]').textContent = text.breathing;
+  document.querySelectorAll(".symptom-grid label").forEach((label, index) => {
+    const input = label.querySelector("input");
+    label.textContent = "";
+    label.appendChild(input);
+    label.append(` ${text.symptomLabels[index] || input.value}`);
+  });
+  const firstBot = chatLog.querySelector(".bot.bubble");
+  if (chatHistory.length === 0 && firstBot) firstBot.textContent = text.chatWelcome;
+}
 
 function dangerClass(level) {
   if (level === "Extreme" || level === "High") return "danger";
@@ -223,6 +436,7 @@ function setupSpeechRecognition() {
   recognition.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
     chatInput.value = transcript;
+    updateAutoLanguageFromText(transcript);
     voiceStatus.textContent = `Heard: ${transcript}`;
     chatInput.focus();
   };
@@ -279,6 +493,7 @@ async function transcribeRecording() {
     const data = await response.json();
     if (!response.ok || !data.text) throw new Error(data.error || "No text");
     chatInput.value = data.text;
+    updateAutoLanguageFromText(data.text);
     voiceStatus.textContent = `Heard: ${data.text}`;
   } catch {
     voiceStatus.textContent = "Server voice recognition is unavailable. Try browser Voice input or type.";
@@ -288,6 +503,7 @@ async function transcribeRecording() {
 async function sendChat() {
   const message = chatInput.value.trim();
   if (!message) return;
+  updateAutoLanguageFromText(message);
 
   addMessage(message, "user");
   chatHistory.push({ role: "user", content: message });
@@ -397,6 +613,7 @@ async function analyzeImage() {
   const formData = new FormData();
   formData.append("image", file);
   formData.append("notes", imageNotes.value);
+  formData.append("chemical_hint", chemicalInput.value);
   formData.append("language", currentLanguage());
 
   try {
@@ -481,9 +698,12 @@ micBtn.addEventListener("click", () => {
 recordBtn.addEventListener("click", toggleRecording);
 imageInput.addEventListener("change", previewImage);
 imageAnalyzeBtn.addEventListener("click", analyzeImage);
+languageSelect.addEventListener("change", applyUILanguage);
+chatInput.addEventListener("input", () => updateAutoLanguageFromText(chatInput.value));
 chatInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") sendChat();
 });
 
 setupSpeechRecognition();
+applyUILanguage();
 loadChecklist();

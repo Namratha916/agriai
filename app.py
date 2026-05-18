@@ -137,6 +137,21 @@ def resolve_language(requested_language: str, *texts: str) -> str:
     return "en"
 
 
+KANNADA_UI_REPLIES = {
+    "greeting": "ನಮಸ್ಕಾರ, ನಾನು AgriAI. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ನಿಮಗೆ ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. ನಾನು ಸರಳವಾಗಿ ಮಾರ್ಗದರ್ಶನ ಮಾಡುತ್ತೇನೆ.",
+    "app_help": "AgriAI ಬಳಸಲು: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, ನಂತರ decontamination checklist ಅನುಸರಿಸಿ. ಗಂಭೀರ ಲಕ್ಷಣಗಳಿದ್ದರೆ emergency alert ಮತ್ತು hospital finder ಬಳಸಿ.",
+    "exposure_question": "ದಯವಿಟ್ಟು label‌ನಲ್ಲಿರುವ ರಾಸಾಯನಿಕದ ಹೆಸರು ಮತ್ತು exposure ಹೇಗೆ ಆಯಿತು ಎಂದು ಹೇಳಿ: ಚರ್ಮ, ಕಣ್ಣು, ಉಸಿರಾಟ ಅಥವಾ ನುಂಗುವಿಕೆ. ತಲೆ ಸುತ್ತುವುದು, ವಾಂತಿ, ಬೆವರು, ಕಣ್ಣು ಉರಿಯುವುದು ಅಥವಾ ಉಸಿರಾಟದ ತೊಂದರೆ ಇದ್ದರೆ ತಿಳಿಸಿ.",
+    "general": "ನಾನು pesticide safety, first aid, decontamination, emergency alert, hospital guidance ಮತ್ತು farming help ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡಬಹುದು. ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಬರೆಯಿರಿ.",
+}
+
+HINDI_UI_REPLIES = {
+    "greeting": "नमस्ते, मैं AgriAI हूं। रसायन का नाम, वह कैसे लगा, और कौन से लक्षण हैं, यह बताइए। मैं आपको सरल तरीके से मार्गदर्शन दूंगा।",
+    "app_help": "AgriAI इस्तेमाल करने के लिए: रसायन का नाम डालें, लक्षण चुनें, और decontamination checklist follow करें। गंभीर लक्षण हों तो emergency alert और hospital finder इस्तेमाल करें।",
+    "exposure_question": "कृपया label पर लिखा रसायन नाम और exposure कैसे हुआ बताएं: त्वचा, आंख, सांस या निगलना। चक्कर, उल्टी, पसीना, आंख जलना या सांस की दिक्कत हो तो बताएं।",
+    "general": "मैं pesticide safety, first aid, decontamination, emergency alert, hospital guidance और farming help में मदद कर सकता हूं। अपना सवाल लिखिए।",
+}
+
+
 def translate_builtin_reply(reply: str, language: str) -> str:
     if language != "kn":
         return reply
@@ -157,6 +172,55 @@ def translate_builtin_reply(reply: str, language: str) -> str:
         ),
     }
     return translations.get(reply, reply)
+
+
+def localized_reply(intent: str, reply: str, language: str) -> str:
+    if language == "kn":
+        return KANNADA_UI_REPLIES.get(intent, reply)
+    if language == "hi":
+        return HINDI_UI_REPLIES.get(intent, reply)
+    return reply
+
+
+def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text: str, language: str) -> str | None:
+    pesticide = find_pesticide(chemical_name) if chemical_name else None
+    pesticide = pesticide or find_pesticide_in_text(user_message) or find_chemical_group(f"{user_message} {chemical_name}")
+    default_name = chemical_name or ("ರಾಸಾಯನಿಕ" if language == "kn" else "रसायन")
+    name = pesticide.get("name", default_name) if pesticide else default_name
+    symptoms = extract_symptoms(f"{user_message} {symptoms_text}")
+    exposure = detect_exposure_route(f"{user_message} {symptoms_text}")
+
+    if language == "kn":
+        danger = pesticide.get("danger_level", "ಗೊತ್ತಿಲ್ಲ") if pesticide else "ಗೊತ್ತಿಲ್ಲ"
+        symptom_text = ", ".join(symptoms) if symptoms else "ಲಕ್ಷಣಗಳನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ನೀಡಿಲ್ಲ"
+        if exposure == "ingestion":
+            first = f"{name} ನುಂಗಿರುವುದು ತುರ್ತು ಪರಿಸ್ಥಿತಿ. ವಾಂತಿ ಮಾಡಿಸಲು ಪ್ರಯತ್ನಿಸಬೇಡಿ, ಏನನ್ನೂ ತಿನ್ನಬೇಡಿ ಅಥವಾ ಕುಡಿಯಬೇಡಿ, ವೈದ್ಯರು ಅಥವಾ poison control ಹೇಳಿದರೆ ಮಾತ್ರ ಮಾಡಿ."
+        else:
+            first = f"{name} exposure ಆಗಿರಬಹುದು. ಕೆಲಸ ನಿಲ್ಲಿಸಿ, spray area ಇಂದ ದೂರ ಹೋಗಿ, fresh air ಇರುವ ಸ್ಥಳದಲ್ಲಿ ಇರಿರಿ."
+        return (
+            f"{first}\n"
+            f"ಅಪಾಯ ಮಟ್ಟ: {danger}.\n"
+            f"ಲಕ್ಷಣಗಳು: {symptom_text}.\n"
+            "ತಕ್ಷಣದ ಕ್ರಮ: contaminated ಬಟ್ಟೆ, shoes ಮತ್ತು gloves ತೆಗೆದು ಬೇರೆ ಇಡಿ. ಚರ್ಮ ಮತ್ತು ಕೂದಲನ್ನು soap ಮತ್ತು running water ಬಳಸಿ ಚೆನ್ನಾಗಿ ತೊಳೆಯಿರಿ. ಕಣ್ಣಿಗೆ ಹೋದರೆ 15 ನಿಮಿಷ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ.\n"
+            "ವೈದ್ಯಕೀಯ ಸಲಹೆ: ಉಸಿರಾಟದ ತೊಂದರೆ, ವಾಂತಿ, ತಲೆ ಸುತ್ತುವುದು, ಗೊಂದಲ, fits ಅಥವಾ ಹೆಚ್ಚು exposure ಇದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. Product label ಅಥವಾ bottle ತೆಗೆದುಕೊಂಡು ಹೋಗಿ. ಭಾರತದಲ್ಲಿ 1800-116-117 ಕರೆ ಮಾಡಬಹುದು."
+        )
+
+    if language == "hi":
+        danger = pesticide.get("danger_level", "Unknown") if pesticide else "Unknown"
+        symptom_text = ", ".join(symptoms) if symptoms else "लक्षण स्पष्ट नहीं दिए गए"
+        if exposure == "ingestion":
+            first = f"{name} निगलना emergency हो सकता है। उल्टी कराने की कोशिश न करें, कुछ खाएं या पिएं नहीं, जब तक doctor या poison control न कहे।"
+        else:
+            first = f"{name} exposure हो सकता है। काम रोकें, spray area से दूर जाएं, और fresh air में रहें।"
+        return (
+            f"{first}\n"
+            f"खतरे का स्तर: {danger}.\n"
+            f"लक्षण: {symptom_text}.\n"
+            "तुरंत कदम: contaminated कपड़े, shoes और gloves हटाकर अलग रखें। त्वचा और बाल soap और running water से धोएं। आंख में गया हो तो 15 मिनट पानी से धोएं.\n"
+            "Medical help: सांस की दिक्कत, उल्टी, चक्कर, confusion, fits या heavy exposure हो तो तुरंत hospital जाएं। Product label या bottle साथ ले जाएं। भारत में 1800-116-117 call करें."
+        )
+
+    return None
 
 
 def find_pesticide(query: str) -> dict[str, Any] | None:
@@ -284,7 +348,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
             intent,
             "Hi, I am AgriAI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.",
         )
-        return reply[0], translate_builtin_reply(reply[1], language)
+        return reply[0], localized_reply(intent, reply[1], language)
 
     if intent == "emergency_help":
         reply = (
@@ -300,7 +364,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
             intent,
             "You can use AgriAI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.",
         )
-        return reply[0], translate_builtin_reply(reply[1], language)
+        return reply[0], localized_reply(intent, reply[1], language)
 
     if intent == "exposure_question" and not find_pesticide(chemical_name) and not find_pesticide_in_text(user_message) and not extract_symptoms(f"{user_message} {symptoms_text}"):
         reply = (
@@ -309,7 +373,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
         )
         if language == "kn":
             return intent, "ದಯವಿಟ್ಟು label‌ನಲ್ಲಿರುವ ರಾಸಾಯನಿಕದ ಹೆಸರು ಮತ್ತು ಏನಾಯಿತು ಎಂದು ಹೇಳಿ: ಚರ್ಮಕ್ಕೆ ತಗುಲಿದೆಯಾ, ಕಣ್ಣಿಗೆ ಸಿಂಪಡಿದೆಯಾ, ಉಸಿರಿನಲ್ಲಿ ಹೋಯಿತಾ, ಅಥವಾ ನುಂಗಿದೀರಾ? ತಲೆ ಸುತ್ತುವುದು, ವಾಂತಿ, ತಲೆನೋವು, ಬೆವರು, ಕಣ್ಣು ಉರಿಯುವುದು ಅಥವಾ ಉಸಿರಾಟದ ತೊಂದರೆ ಇದ್ದರೆ ತಿಳಿಸಿ."
-        return reply
+        return reply[0], localized_reply(intent, reply[1], language)
 
     if intent == "general":
         reply = (
@@ -318,14 +382,12 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
         )
         if language == "kn":
             return intent, "ನಾನು pesticide exposure, ಲಕ್ಷಣಗಳು, first aid, decontamination steps, emergency message ಮತ್ತು hospital guidance ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡಬಹುದು. ಏನಾಯಿತು ಎಂದು ಒಂದು ವಾಕ್ಯದಲ್ಲಿ ಹೇಳಿ, ರಾಸಾಯನಿಕದ ಹೆಸರು ಗೊತ್ತಿದ್ದರೆ ಸೇರಿಸಿ."
-        return reply
+        return reply[0], localized_reply(intent, reply[1], language)
 
     safety_reply = build_safety_reply(user_message, chemical_name, symptoms_text)
-    if language == "kn":
-        safety_reply = (
-            "ಇದು ಗಂಭೀರವಾಗಿರಬಹುದು. " + safety_reply +
-            " ದಯವಿಟ್ಟು ಈ ಮಾಹಿತಿ ಓದಿ, ಹತ್ತಿರದ ವೈದ್ಯರು ಅಥವಾ ಆಸ್ಪತ್ರೆಗೆ ತಕ್ಷಣ ಸಂಪರ್ಕಿಸಿ."
-        )
+    localized = localized_safety_reply(user_message, chemical_name, symptoms_text, language)
+    if localized:
+        safety_reply = localized
     return intent, safety_reply
 
 
@@ -557,8 +619,9 @@ def api_emergency_message():
 @app.post("/api/analyze-image")
 def api_analyze_image():
     uploaded_file = request.files.get("image")
-    language = resolve_language(request.form.get("language", "auto"), request.form.get("notes", ""))
     notes = request.form.get("notes", "").strip()
+    chemical_hint = request.form.get("chemical_hint", "").strip()
+    language = resolve_language(request.form.get("language", "auto"), notes, chemical_hint)
 
     if uploaded_file is None:
         return jsonify({"reply": "Upload a pesticide label photo first.", "model": "no-image"}), 400
@@ -568,7 +631,7 @@ def api_analyze_image():
         return jsonify({"reply": "The uploaded image file is empty.", "model": "empty-image"}), 400
 
     ocr_result = OCR.analyze(image_bytes)
-    extracted = KB.identify_from_ocr(ocr_result.text, uploaded_file.filename, notes)
+    extracted = KB.identify_from_ocr(ocr_result.text, uploaded_file.filename, notes, chemical_hint)
     details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"])
     rag_context = RAG.context(f"{details['pesticide_name']} {ocr_result.text} {notes}", top_k=4)
     pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
@@ -627,7 +690,9 @@ def api_chat():
     chemical_name = str(payload.get("chemical", "")).strip()
     symptoms = str(payload.get("symptoms", "")).strip()
     history = payload.get("history", [])
-    language = resolve_language(str(payload.get("language", "auto")), user_message, symptoms)
+    requested_language = str(payload.get("language", "auto"))
+    language = resolve_language(requested_language, user_message, symptoms)
+    prompt_language = "auto" if requested_language == "auto" and language == "en" else language
 
     if not user_message:
         return jsonify({"reply": "Tell me what happened, the chemical name if known, and the symptoms you are seeing."}), 400
@@ -657,7 +722,7 @@ def api_chat():
     if is_safety_intent:
         system_prompt = "You are AgriAI. Give short, medically safe pesticide guidance grounded in retrieved context."
         user_content = SAFETY_RESPONSE_PROMPT.format(
-            language=language_name(language),
+            language=language_name(prompt_language),
             pesticide_name=pesticide_name,
             symptoms=symptoms or ", ".join(extract_symptoms(user_message)) or "Not provided",
             exposure_route=exposure_route,
@@ -667,7 +732,7 @@ def api_chat():
     else:
         system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
         user_content = GENERAL_CHAT_PROMPT.format(
-            language=language_name(language),
+            language=language_name(prompt_language),
             rag_context=rag_context or "No specific pesticide context retrieved.",
             user_message=user_message,
         )
@@ -737,7 +802,9 @@ def api_chat_stream():
     user_message = str(payload.get("message", "")).strip()
     symptoms = str(payload.get("symptoms", "")).strip()
     chemical_name = str(payload.get("chemical", "")).strip()
-    language = resolve_language(str(payload.get("language", "auto")), user_message, symptoms)
+    requested_language = str(payload.get("language", "auto"))
+    language = resolve_language(requested_language, user_message, symptoms)
+    prompt_language = "auto" if requested_language == "auto" and language == "en" else language
     if not user_message:
         return jsonify({"error": "message is required"}), 400
 
@@ -768,7 +835,7 @@ def api_chat_stream():
 
     if is_safety_intent:
         prompt = SAFETY_RESPONSE_PROMPT.format(
-            language=language_name(language),
+            language=language_name(prompt_language),
             pesticide_name=pesticide_name,
             symptoms=symptoms or ", ".join(extract_symptoms(user_message)) or "Not provided",
             exposure_route=detect_exposure_route(f"{user_message} {symptoms}") or "Unknown",
@@ -778,7 +845,7 @@ def api_chat_stream():
         system_prompt = "You are AgriAI. Stream concise, medically safe pesticide guidance."
     else:
         prompt = GENERAL_CHAT_PROMPT.format(
-            language=language_name(language),
+            language=language_name(prompt_language),
             rag_context=rag_context or "No specific pesticide context retrieved.",
             user_message=user_message,
         )
