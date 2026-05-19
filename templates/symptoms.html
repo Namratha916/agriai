@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page active">
+  <article class="panel">
+    <div class="section-title">
+      <span>SY</span>
+      <div>
+        <h2>Symptom Checker</h2>
+        <p>Select symptoms or type your own observations.</p>
+      </div>
+    </div>
+    <input id="chemicalInput" placeholder="Optional pesticide name">
+    <div class="symptom-grid">
+      <label><input type="checkbox" value="headache"> Headache</label>
+      <label><input type="checkbox" value="vomiting"> Vomiting</label>
+      <label><input type="checkbox" value="dizziness"> Dizziness</label>
+      <label><input type="checkbox" value="eye irritation"> Eye irritation</label>
+      <label><input type="checkbox" value="breathing difficulty"> Breathing difficulty</label>
+      <label><input type="checkbox" value="sweating"> Heavy sweating</label>
+      <label><input type="checkbox" value="muscle twitching"> Muscle twitching</label>
+      <label><input type="checkbox" value="confusion"> Confusion</label>
+    </div>
+    <textarea id="symptomText" rows="3" placeholder="Other symptoms or what happened..."></textarea>
+    <button id="symptomBtn" class="wide" type="button">Analyze symptoms</button>
+    <div id="symptomResult" class="result-box muted">Symptom guidance will appear here.</div>
+  </article>
+</section>
+{% endblock %}

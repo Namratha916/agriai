@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page active">
+  <article class="panel chat-panel">
+    <div class="section-title">
+      <span>AI</span>
+      <div>
+        <h2>AgriAI Chatbot</h2>
+        <p>Ask naturally by text or voice. The answer stays focused on what you said.</p>
+      </div>
+    </div>
+    <div id="chatLog" class="chat-log">
+      <div class="bot bubble">Tell me the pesticide name, how exposure happened, and symptoms. I will guide the next step.</div>
+    </div>
+    <div class="voice-controls">
+      <button id="micBtn" type="button">Voice input</button>
+      <button id="recordBtn" type="button">Record voice</button>
+      <button id="voiceToggleBtn" type="button" class="voice-toggle" aria-pressed="true">Voice ON</button>
+      <span id="selectedLanguageStatus" class="language-chip">English</span>
+      <span id="voiceStatus" class="muted">Voice uses your browser speech tools.</span>
+    </div>
+    <div class="chat-form">
+      <input id="chatInput" placeholder="Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?">
+      <button id="chatBtn" type="button">Send</button>
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -17,7 +17,7 @@ class OCRService:
     def __init__(
         self,
         trocr_model: str = "microsoft/trocr-base-printed",
-        local_only: bool = True,
+        local_only: bool = False,
         enable_deep_ocr: bool = False,
     ):
         self.trocr_model = trocr_model
@@ -51,6 +51,10 @@ class OCRService:
             result.errors.append("deep_ocr_disabled: set AGRIAI_DEEP_OCR=1 to enable EasyOCR/TrOCR")
 
         result.text = "\n".join(dedupe_lines(texts)).strip()
+        if not result.text:
+            result.errors.append(
+                "no_text_extracted: OCR could not read the label. Type visible label text or install Tesseract/EasyOCR models."
+            )
         return result
 
     def _preprocess_images(self, image_bytes: bytes, result: OCRResult):
@@ -105,8 +109,9 @@ class OCRService:
             import pytesseract
 
             configs = [
+                "-l eng+hin+kan --oem 3 --psm 6",
+                "-l eng+hin+kan --oem 3 --psm 11",
                 "--oem 3 --psm 6",
-                "--oem 3 --psm 11",
             ]
             chunks = []
             for config in configs:
@@ -126,7 +131,10 @@ class OCRService:
             import easyocr
 
             if self._easyocr_reader is None:
-                self._easyocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+                try:
+                    self._easyocr_reader = easyocr.Reader(["en", "hi", "kn"], gpu=False, verbose=False)
+                except Exception:
+                    self._easyocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
             values = self._easyocr_reader.readtext(np.array(image), detail=1, paragraph=True)
             chunks = []
             confidences = []

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page active">
+  <article class="panel image-panel">
+    <div class="section-title">
+      <span>IMG</span>
+      <div>
+        <h2>Pesticide Photo Analyzer</h2>
+        <p>Upload a clear pesticide label. If OCR misses text, type the visible product name or active ingredient.</p>
+      </div>
+    </div>
+    <div class="image-grid">
+      <div>
+        <input id="chemicalInput" placeholder="Optional chemical hint, e.g. chlorpyrifos">
+        <input id="imageInput" type="file" accept="image/*" capture="environment">
+        <textarea id="imageNotes" rows="3" placeholder="Optional visible label text, e.g. chlorpyrifos 20% EC"></textarea>
+        <button id="imageAnalyzeBtn" class="wide" type="button">Analyze photo</button>
+      </div>
+      <div>
+        <img id="imagePreview" class="image-preview" alt="Pesticide label preview">
+        <div id="imageResult" class="result-box muted">Image analysis result will appear here.</div>
+      </div>
+    </div>
+  </article>
+</section>
+{% endblock %}

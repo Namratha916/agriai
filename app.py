@@ -26,7 +26,7 @@ VECTOR_DIR = BASE_DIR / "vector_store"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "25"))
-HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
+HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "0") == "1"
 AI_IMAGE_EXPLANATION = os.getenv("AI_IMAGE_EXPLANATION", "0") == "1"
 
 app = Flask(__name__)
@@ -276,11 +276,12 @@ def detect_exposure_route(text: str) -> str | None:
 
 
 def classify_chat_intent(user_message: str, chemical_name: str = "", symptoms_text: str = "") -> str:
+    raw_message = (user_message or "").strip().lower()
     clean_message = normalize(user_message)
     combined = normalize(f"{user_message} {chemical_name} {symptoms_text}")
 
-    greetings = {"hi", "hello", "hey", "namaste", "good morning", "good evening", "good afternoon"}
-    if clean_message in greetings:
+    greetings = {"hi", "hello", "hey", "namaste", "good morning", "good evening", "good afternoon", "ನಮಸ್ಕಾರ", "नमस्ते"}
+    if clean_message in greetings or raw_message in greetings:
         return "greeting"
 
     info_question_starts = (
@@ -538,6 +539,51 @@ def index():
     return render_template("index.html", pesticides=PESTICIDES)
 
 
+@app.get("/chatbot")
+def chatbot_page():
+    return render_template("chatbot.html")
+
+
+@app.get("/identifier")
+def identifier_page():
+    return render_template("identifier.html", pesticides=PESTICIDES)
+
+
+@app.get("/identify")
+def identify_redirect_page():
+    return render_template("identifier.html", pesticides=PESTICIDES)
+
+
+@app.get("/analyzer")
+def analyzer_page():
+    return render_template("analyzer.html")
+
+
+@app.get("/image")
+def image_redirect_page():
+    return render_template("analyzer.html")
+
+
+@app.get("/checklist")
+def checklist_page():
+    return render_template("checklist.html")
+
+
+@app.get("/symptoms")
+def symptoms_page():
+    return render_template("symptoms.html")
+
+
+@app.get("/emergency")
+def emergency_page():
+    return render_template("emergency.html")
+
+
+@app.get("/hospital")
+def hospital_page():
+    return render_template("hospital.html")
+
+
 @app.get("/api/pesticides")
 def api_pesticides():
     return jsonify(PESTICIDES)
@@ -631,9 +677,10 @@ def api_analyze_image():
         return jsonify({"reply": "The uploaded image file is empty.", "model": "empty-image"}), 400
 
     ocr_result = OCR.analyze(image_bytes)
+    readable_text = "\n".join(part for part in [chemical_hint, notes, uploaded_file.filename, ocr_result.text] if part)
     extracted = KB.identify_from_ocr(ocr_result.text, uploaded_file.filename, notes, chemical_hint)
-    details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"])
-    rag_context = RAG.context(f"{details['pesticide_name']} {ocr_result.text} {notes}", top_k=4)
+    details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"], extracted.get("product_guess", ""))
+    rag_context = RAG.context(f"{details['pesticide_name']} {readable_text}", top_k=3)
     pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
 
     fallback_reply = format_image_report(details, ocr_result, extracted, language)
@@ -641,7 +688,7 @@ def api_analyze_image():
     if AI_IMAGE_EXPLANATION:
         prompt = IMAGE_ANALYSIS_PROMPT.format(
             language=language_name(language),
-            ocr_text=ocr_result.text or "No readable text was extracted.",
+            ocr_text=readable_text or "No readable text was extracted.",
             pesticide_context=pesticide_context,
         )
         ai_reply = OLLAMA.chat(
@@ -658,6 +705,7 @@ def api_analyze_image():
             "reply": reply,
             "details": details,
             "ocr_text": ocr_result.text,
+            "analyzed_text": readable_text,
             "ocr_engines": ocr_result.engines_used,
             "ocr_errors": ocr_result.errors[:5],
             "toxicity_level": extracted["toxicity_level"],
@@ -785,11 +833,8 @@ def api_chat():
 
     return jsonify(
         {
-            "reply": (
-                "I could not get a generated answer from the local Ollama model in time. "
-                "Please make sure Ollama is open, then try again. I will still answer pesticide safety and project questions immediately."
-            ),
-            "model": "ollama-timeout",
+            "reply": build_general_fallback_reply(user_message, chemical_name, rag_context, language),
+            "model": "agriai-context-fallback",
         }
     )
 
@@ -906,7 +951,7 @@ def api_chat_stream():
                     except Exception:
                         continue
         except Exception:
-            fallback = safety_reply if is_safety_intent else "AgriAI could not stream from Ollama right now."
+            fallback = safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language)
             yield f"data: {json.dumps({'token': fallback})}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -915,6 +960,177 @@ def api_chat_stream():
 
 def warm_ollama_model() -> None:
     OLLAMA.warm()
+
+
+def _language_pack(language: str) -> dict[str, str]:
+    packs = {
+        "en": {
+            "greeting": "Hi, I am AgriAI. Tell me the pesticide name, how it touched you, and what you feel now. I will keep it practical.",
+            "need_details": "I need one more detail: pesticide name if you know it, exposure type, and symptoms. Example: 'chlorpyrifos spray touched my skin and I feel dizzy'.",
+            "emergency": "This can be urgent. If there is breathing trouble, fainting, seizure, confusion, severe vomiting, eye exposure, or swallowing pesticide, call 112 or go to hospital now. Carry the label.",
+        },
+        "hi": {
+            "greeting": "नमस्ते, मैं AgriAI हूं। कीटनाशक का नाम, संपर्क कैसे हुआ, और अभी क्या महसूस हो रहा है बताइए।",
+            "need_details": "मुझे एक जानकारी और चाहिए: कीटनाशक का नाम, संपर्क कैसे हुआ, और लक्षण। जैसे: 'chlorpyrifos त्वचा पर लगा और चक्कर आ रहा है'।",
+            "emergency": "यह जरूरी हो सकता है। सांस में दिक्कत, बेहोशी, दौरा, भ्रम, तेज उल्टी, आंख में रसायन या निगलने पर 112 कॉल करें या तुरंत अस्पताल जाएं। लेबल साथ ले जाएं।",
+        },
+        "kn": {
+            "greeting": "ನಮಸ್ಕಾರ, ನಾನು AgriAI. ಕೀಟನಾಶಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಈಗ ನಿಮಗೆ ಏನು ಅನಿಸುತ್ತಿದೆ ಎಂದು ಹೇಳಿ.",
+            "need_details": "ನನಗೆ ಇನ್ನೊಂದು ವಿವರ ಬೇಕು: ಕೀಟನಾಶಕದ ಹೆಸರು, ಸಂಪರ್ಕ ಹೇಗೆ ಆಯಿತು, ಮತ್ತು ಲಕ್ಷಣಗಳು. ಉದಾ: 'chlorpyrifos ಚರ್ಮಕ್ಕೆ ತಗುಲಿತು ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ'.",
+            "emergency": "ಇದು ತುರ್ತು ಆಗಿರಬಹುದು. ಉಸಿರಾಟ ತೊಂದರೆ, ಮೂರ್ಛೆ, ಫಿಟ್ಸ್, ಗೊಂದಲ, ತೀವ್ರ ವಾಂತಿ, ಕಣ್ಣಿಗೆ ರಾಸಾಯನಿಕ ಅಥವಾ ನುಂಗಿದರೆ 112 ಕರೆ ಮಾಡಿ ಅಥವಾ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. ಲೇಬಲ್ ತೆಗೆದುಕೊಂಡು ಹೋಗಿ.",
+        },
+    }
+    return packs.get(language, packs["en"])
+
+
+def translate_builtin_reply(reply: str, language: str) -> str:
+    if language == "hi":
+        return (
+            "कीटनाशक ऐसा रासायनिक या प्राकृतिक पदार्थ है जो कीड़े, खरपतवार, फफूंद या चूहों जैसे कीटों को नियंत्रित करता है। "
+            "यह फसल बचाता है, लेकिन त्वचा, आंख, सांस या निगलने से नुकसान कर सकता है। छिड़काव के बाद PPE पहनें, साबुन-पानी से सफाई करें, और लक्षण हों तो डॉक्टर से मदद लें।"
+        )
+    if language == "kn":
+        return (
+            "ಕೀಟನಾಶಕ ಎಂದರೆ ಕೀಟ, ಕಳೆ, ಫಂಗಸ್ ಅಥವಾ ಇಲಿ ಮುಂತಾದವುಗಳನ್ನು ನಿಯಂತ್ರಿಸಲು ಬಳಸುವ ರಾಸಾಯನಿಕ ಅಥವಾ ನೈಸರ್ಗಿಕ ಪದಾರ್ಥ. "
+            "ಇದು ಬೆಳೆಗಳನ್ನು ರಕ್ಷಿಸುತ್ತದೆ, ಆದರೆ ಚರ್ಮ, ಕಣ್ಣು, ಉಸಿರಾಟ ಅಥವಾ ನುಂಗುವ ಮೂಲಕ ದೇಹಕ್ಕೆ ಹಾನಿ ಮಾಡಬಹುದು. ಸಿಂಪಡಿಸಿದ ನಂತರ PPE ಬಳಸಿ, ಸಾಬೂನು-ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ, ಮತ್ತು ಲಕ್ಷಣಗಳಿದ್ದರೆ ವೈದ್ಯರನ್ನು ಸಂಪರ್ಕಿಸಿ."
+        )
+    return reply
+
+
+def build_domain_info_reply(user_message: str, language: str = "en") -> str | None:
+    clean_message = normalize(user_message)
+    if any(phrase in clean_message for phrase in ("what is pesticide", "what are pesticides", "define pesticide", "pesticide meaning")):
+        return translate_builtin_reply(
+            "A pesticide is a chemical or natural substance used to control pests such as insects, weeds, fungi, or rodents. Farmers use pesticides to protect crops, but some pesticides can harm people if they touch the skin, get into the eyes, are breathed in, or are swallowed. That is why workers should use protective gear, wash properly after spraying, and get medical help quickly if symptoms appear.",
+            language,
+        )
+    if "organophosphate" in clean_message and not detect_exposure_route(clean_message):
+        if language == "hi":
+            return "Organophosphates कीटनाशकों का एक समूह है जो nervous system को प्रभावित कर सकता है। संपर्क के बाद सिरदर्द, उल्टी, पसीना, लार, छोटी पुतलियां, मांसपेशी फड़कना या सांस की दिक्कत हो सकती है। निगलने या ज्यादा exposure में तुरंत अस्पताल जाएं।"
+        if language == "kn":
+            return "Organophosphates ನರಮಂಡಲದ ಮೇಲೆ ಪರಿಣಾಮ ಬೀರುವ ಕೀಟನಾಶಕಗಳ ಗುಂಪು. ಸಂಪರ್ಕವಾದ ನಂತರ ತಲೆನೋವು, ವಾಂತಿ, ಬೆವರು, ಲಾಲೆ, ಸಣ್ಣ ಕಣ್ಣುಮಣಿ, ಮಾಂಸಖಂಡ ಫಡಕುವುದು ಅಥವಾ ಉಸಿರಾಟ ತೊಂದರೆ ಕಾಣಬಹುದು. ನುಂಗಿದರೆ ಅಥವಾ ಹೆಚ್ಚು exposure ಇದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
+        return "Organophosphates are insecticides that can affect the nervous system. Exposure may cause headache, vomiting, sweating, salivation, pinpoint pupils, muscle twitching, or breathing trouble. Swallowing or heavy exposure needs urgent hospital care."
+    if "safe return" in clean_message or "this project" in clean_message or "agriai" in clean_message:
+        if language == "hi":
+            return "AgriAI किसानों और spray workers के लिए pesticide safety assistant है। यह label photo analyze करता है, chemical पहचानता है, symptoms समझता है, RAG से safety जानकारी लाता है, और English/Hindi/Kannada में practical guidance देता है।"
+        if language == "kn":
+            return "AgriAI ರೈತರು ಮತ್ತು spray workers ಗಾಗಿ pesticide safety assistant. ಇದು label photo ವಿಶ್ಲೇಷಿಸುತ್ತದೆ, chemical ಗುರುತಿಸುತ್ತದೆ, symptoms ಅರ್ಥಮಾಡಿಕೊಳ್ಳುತ್ತದೆ, RAG ಮೂಲಕ safety ಮಾಹಿತಿ ತರುತ್ತದೆ, ಮತ್ತು English/Hindi/Kannada ನಲ್ಲಿ practical guidance ನೀಡುತ್ತದೆ."
+        return "AgriAI is a pesticide safety assistant for farmers and spray workers. It analyzes label photos, identifies chemicals, checks symptoms, retrieves safety knowledge with RAG, and gives practical guidance in English, Hindi, and Kannada."
+    return None
+
+
+def localized_reply(intent: str, reply: str, language: str) -> str:
+    pack = _language_pack(language)
+    if intent == "greeting":
+        return pack["greeting"]
+    if intent in {"app_help", "exposure_question", "general"}:
+        return pack["need_details"] if intent == "exposure_question" else reply
+    if intent == "emergency_help":
+        return pack["emergency"]
+    return reply
+
+
+def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text: str, language: str) -> str | None:
+    if language == "en":
+        return None
+    pesticide = find_pesticide(chemical_name) if chemical_name else None
+    pesticide = pesticide or find_pesticide_in_text(user_message) or find_chemical_group(f"{user_message} {chemical_name}")
+    name = pesticide.get("name", chemical_name or "Unknown pesticide") if pesticide else (chemical_name or "Unknown pesticide")
+    danger = pesticide.get("danger_level", "Unknown") if pesticide else "Unknown"
+    symptoms = ", ".join(extract_symptoms(f"{user_message} {symptoms_text}")) or "not clearly provided"
+    route = detect_exposure_route(f"{user_message} {symptoms_text}") or "unknown"
+    if language == "hi":
+        return (
+            f"1. कीटनाशक: {name}\n"
+            f"2. खतरा स्तर: {danger}\n"
+            f"3. लक्षण: {symptoms}\n"
+            f"4. संपर्क: {route}\n"
+            "5. अभी करें: स्प्रे क्षेत्र से दूर जाएं, ताजी हवा में रहें, दूषित कपड़े अलग करें।\n"
+            "6. सफाई: त्वचा और बालों को साबुन और बहते पानी से धोएं। आंख में गया हो तो 15 मिनट पानी से धोएं।\n"
+            "7. डॉक्टर: लक्षण बढ़ें, उल्टी/चक्कर/सांस की दिक्कत हो, या निगला हो तो तुरंत अस्पताल जाएं।"
+        )
+    if language == "kn":
+        return (
+            f"1. ಕೀಟನಾಶಕ: {name}\n"
+            f"2. ಅಪಾಯ ಮಟ್ಟ: {danger}\n"
+            f"3. ಲಕ್ಷಣಗಳು: {symptoms}\n"
+            f"4. ಸಂಪರ್ಕ: {route}\n"
+            "5. ಈಗ ಮಾಡಿ: ಸ್ಪ್ರೇ ಪ್ರದೇಶದಿಂದ ದೂರ ಹೋಗಿ, ತಾಜಾ ಗಾಳಿಯಲ್ಲಿ ಇರಿ, ಕಲುಷಿತ ಬಟ್ಟೆಗಳನ್ನು ಬೇರ್ಪಡಿಸಿ.\n"
+            "6. ಸ್ವಚ್ಛತೆ: ಚರ್ಮ ಮತ್ತು ಕೂದಲನ್ನು ಸಾಬೂನು ಮತ್ತು ಹರಿಯುವ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ. ಕಣ್ಣಿಗೆ ಹೋದರೆ 15 ನಿಮಿಷ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ.\n"
+            "7. ವೈದ್ಯರು: ಲಕ್ಷಣಗಳು ಹೆಚ್ಚಾದರೆ, ವಾಂತಿ/ತಲೆಸುತ್ತು/ಉಸಿರಾಟ ತೊಂದರೆ ಇದ್ದರೆ, ಅಥವಾ ನುಂಗಿದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
+        )
+    return None
+
+
+def build_general_fallback_reply(user_message: str, chemical_name: str, rag_context: str, language: str = "en") -> str:
+    pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
+    if pesticide:
+        reply = (
+            f"{pesticide.get('name')} is a {pesticide.get('category', 'pesticide')}. "
+            f"Danger level: {pesticide.get('danger_level', 'Unknown')}. "
+            f"Possible symptoms include {', '.join(pesticide.get('symptoms', [])) or 'irritation or poisoning symptoms'}. "
+            f"First aid: {pesticide.get('first_aid', 'Stop exposure, wash exposed areas, and seek medical advice if symptoms appear.')}"
+        )
+    elif rag_context:
+        reply = "Here is the relevant pesticide-safety guidance I found: " + " ".join(rag_context.split())[:650]
+    else:
+        if language == "hi":
+            return (
+                f"मैंने आपका सवाल समझा: '{user_message}'। मैं pesticide और farm-chemical safety में सबसे अच्छा मदद कर सकता हूं। "
+                "उत्पाद का नाम, label text, या क्या हुआ यह बताइए। उदाहरण: 'chlorpyrifos spray के बाद चक्कर आ रहा है'।"
+            )
+        if language == "kn":
+            return (
+                f"ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಅರ್ಥವಾಗಿದೆ: '{user_message}'. ನಾನು pesticide ಮತ್ತು farm-chemical safety ಬಗ್ಗೆ ಹೆಚ್ಚು ಚೆನ್ನಾಗಿ ಸಹಾಯ ಮಾಡಬಹುದು. "
+                "ಉತ್ಪನ್ನದ ಹೆಸರು, label text, ಅಥವಾ ಏನಾಯಿತು ಎಂದು ಹೇಳಿ. ಉದಾ: 'chlorpyrifos spray ಮಾಡಿದ ನಂತರ ತಲೆ ಸುತ್ತುತ್ತಿದೆ'."
+            )
+        reply = (
+            f"I understand your question: '{user_message}'. I am strongest with pesticide and farm-chemical safety, so I can help best if you tell me the product name, label text, or what happened. "
+            "You can ask normally, for example: 'I feel dizzy after spraying chlorpyrifos' or 'What precautions should I take for paraquat?'"
+        )
+    if language == "hi":
+        return "मैंने आपकी बात समझी। " + reply + " गंभीर लक्षण हों तो अस्पताल जाएं या 1800-116-117 पर कॉल करें।"
+    if language == "kn":
+        return "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಅರ್ಥವಾಗಿದೆ. " + reply + " ಗಂಭೀರ ಲಕ್ಷಣಗಳಿದ್ದರೆ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ ಅಥವಾ 1800-116-117 ಗೆ ಕರೆ ಮಾಡಿ."
+    return reply
+
+
+def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en") -> str:
+    name = details.get("pesticide_name", "Not detected from image")
+    active = ", ".join(details.get("active_ingredients", [])) or "Unknown"
+    danger = extracted.get("toxicity_level") or details.get("harmfulness_level", "Unknown")
+    category = extracted.get("toxicity_category") or details.get("toxicity_category", "Unknown")
+    side_effects = ", ".join(details.get("side_effects", [])) or "Unknown"
+    note = "" if ocr_result.text else "\nNote: OCR could not read the image clearly. Type the visible label text or pesticide name for better accuracy."
+    if language == "hi":
+        return (
+            f"1. कीटनाशक पहचान: {name}\n2. सक्रिय घटक: {active}\n3. खतरा स्तर: {danger}\n"
+            f"4. विष श्रेणी: {category}\n5. दुष्प्रभाव: {side_effects}\n6. प्राथमिक उपचार: {details.get('first_aid')}\n"
+            f"7. सुरक्षा: {'; '.join(details.get('safety_precautions', []))}\n8. सफाई: {'; '.join(details.get('decontamination_steps', []))}\n"
+            "9. आपात सलाह: सांस की दिक्कत, बेहोशी, तेज उल्टी, आंख में रसायन या निगलने पर तुरंत अस्पताल जाएं."
+            f"{note}"
+        )
+    if language == "kn":
+        return (
+            f"1. ಕೀಟನಾಶಕ ಗುರುತು: {name}\n2. ಸಕ್ರಿಯ ಪದಾರ್ಥಗಳು: {active}\n3. ಅಪಾಯ ಮಟ್ಟ: {danger}\n"
+            f"4. ವಿಷ ವರ್ಗ: {category}\n5. ದುಷ್ಪರಿಣಾಮಗಳು: {side_effects}\n6. ಮೊದಲ ನೆರವು: {details.get('first_aid')}\n"
+            f"7. ಸುರಕ್ಷತೆ: {'; '.join(details.get('safety_precautions', []))}\n8. ಸ್ವಚ್ಛತೆ: {'; '.join(details.get('decontamination_steps', []))}\n"
+            "9. ತುರ್ತು ಸಲಹೆ: ಉಸಿರಾಟ ತೊಂದರೆ, ಮೂರ್ಛೆ, ತೀವ್ರ ವಾಂತಿ, ಕಣ್ಣಿಗೆ ರಾಸಾಯನಿಕ ಅಥವಾ ನುಂಗಿದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
+            f"{note}"
+        )
+    return (
+        f"1. Pesticide Identification: {name}\n"
+        f"2. Active Ingredients: {active}\n"
+        f"3. Danger Level: {danger}\n"
+        f"4. Toxicity Category: {category}\n"
+        f"5. Side Effects: {side_effects}\n"
+        f"6. First Aid: {details.get('first_aid')}\n"
+        f"7. Safety Tips: {'; '.join(details.get('safety_precautions', []))}\n"
+        f"8. Decontamination: {'; '.join(details.get('decontamination_steps', []))}\n"
+        f"9. Environmental Impact: {details.get('environmental_impact')}\n"
+        "10. Emergency Recommendation: Go to hospital for breathing trouble, fainting, severe vomiting, eye exposure, or swallowing pesticide."
+        f"{note}"
+    )
 
 
 if __name__ == "__main__":

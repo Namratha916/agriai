@@ -1,426 +1,356 @@
-const chemicalInput = document.querySelector("#chemicalInput");
-const chemicalResult = document.querySelector("#chemicalResult");
-const lookupBtn = document.querySelector("#lookupBtn");
-const checklist = document.querySelector("#checklist");
-const symptomBtn = document.querySelector("#symptomBtn");
-const symptomResult = document.querySelector("#symptomResult");
-const symptomText = document.querySelector("#symptomText");
-const locationBtn = document.querySelector("#locationBtn");
-const alertBtn = document.querySelector("#alertBtn");
-const emergencyMessage = document.querySelector("#emergencyMessage");
-const hospitalLink = document.querySelector("#hospitalLink");
-const chatLog = document.querySelector("#chatLog");
-const chatInput = document.querySelector("#chatInput");
-const chatBtn = document.querySelector("#chatBtn");
-const languageSelect = document.querySelector("#languageSelect");
-const micBtn = document.querySelector("#micBtn");
-const recordBtn = document.querySelector("#recordBtn");
-const voiceToggleBtn = document.querySelector("#voiceToggleBtn");
-const voiceStatus = document.querySelector("#voiceStatus");
-const selectedLanguageStatus = document.querySelector("#selectedLanguageStatus");
-const imageInput = document.querySelector("#imageInput");
-const imagePreview = document.querySelector("#imagePreview");
-const imageNotes = document.querySelector("#imageNotes");
-const imageAnalyzeBtn = document.querySelector("#imageAnalyzeBtn");
-const imageResult = document.querySelector("#imageResult");
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+const el = {
+  chemicalInput: $("#chemicalInput"),
+  chemicalResult: $("#chemicalResult"),
+  lookupBtn: $("#lookupBtn"),
+  checklist: $("#checklist"),
+  symptomBtn: $("#symptomBtn"),
+  symptomResult: $("#symptomResult"),
+  symptomText: $("#symptomText"),
+  locationBtn: $("#locationBtn"),
+  alertBtn: $("#alertBtn"),
+  emergencyMessage: $("#emergencyMessage"),
+  hospitalLink: $("#hospitalLink"),
+  chatLog: $("#chatLog"),
+  chatInput: $("#chatInput"),
+  chatBtn: $("#chatBtn"),
+  languageSelect: $("#languageSelect"),
+  micBtn: $("#micBtn"),
+  recordBtn: $("#recordBtn"),
+  voiceToggleBtn: $("#voiceToggleBtn"),
+  voiceStatus: $("#voiceStatus"),
+  selectedLanguageStatus: $("#selectedLanguageStatus"),
+  imageInput: $("#imageInput"),
+  imagePreview: $("#imagePreview"),
+  imageNotes: $("#imageNotes"),
+  imageAnalyzeBtn: $("#imageAnalyzeBtn"),
+  imageResult: $("#imageResult"),
+};
 
 let selectedLocation = "";
-const chatHistory = [];
 let recognition = null;
 let mediaRecorder = null;
 let recordedChunks = [];
-let detectedAutoLanguage = "en";
-let voiceEnabled = localStorage.getItem("agriaiVoiceEnabled") !== "false";
 let fallbackAudio = null;
+
+const state = {
+  chatHistory: [],
+  detectedAutoLanguage: "en",
+  voiceEnabled: localStorage.getItem("agriaiVoiceEnabled") !== "false",
+  voiceAutoSend: localStorage.getItem("agriaiVoiceAutoSend") === "true",
+};
 
 const UI_TEXT = {
   en: {
-    eyebrow: "Chemical decontamination alert system",
     language: "Language",
     helpline: "India poison helpline: 1800-116-117",
-    chemicalTitle: "Chemical Identifier",
-    chemicalDesc: "Enter the pesticide or chemical name from the bottle, bag, or label.",
-    chemicalPlaceholder: "Example: chlorpyrifos, paraquat, glyphosate",
-    check: "Check",
-    chemicalResult: "Chemical risk details will appear here.",
-    imageTitle: "Pesticide Photo Analyzer",
-    imageDesc: "Upload or capture the pesticide label. Type visible label text if OCR cannot read the image.",
-    imageNotes: "Optional: type any label text you can read, e.g. chlorpyrifos 20% EC",
-    analyzePhoto: "Analyze photo",
-    imageResult: "Image analysis result will appear here.",
-    checklistTitle: "Decontamination Checklist",
-    checklistDesc: "Choose exposure type and follow each step before entering the home.",
-    skin: "Skin/clothes",
-    eyes: "Eyes",
-    breathing: "Breathing",
-    symptomsTitle: "Symptom Checker",
-    symptomsDesc: "Select symptoms or type your own observations.",
-    symptomText: "Other symptoms or what happened...",
-    analyzeSymptoms: "Analyze symptoms",
-    emergencyTitle: "Emergency Help",
-    emergencyDesc: "Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.",
-    location: "Use location",
-    createAlert: "Create message",
-    emergencyMessage: "Emergency message will be generated here.",
-    hospitalTitle: "Nearby Hospital Finder",
-    hospitalDesc: "Open a map search for hospitals or poison support near your position.",
-    nearestHospital: "Nearest hospital",
-    poisonCenter: "Poison control center",
-    callPoison: "Call 1800-116-117",
-    chatTitle: "AgriAI Chatbot",
-    chatDesc: "Powered by your local Ollama model when Ollama is running.",
-    chatWelcome: "Tell me the chemical name, how exposure happened, and symptoms. I will guide the next step.",
     voiceInput: "Voice input",
     recordVoice: "Record voice",
-    voiceOn: "🔊 Voice ON",
-    voiceOff: "🔇 Voice OFF",
-    voiceStatus: "Voice uses your browser speech tools.",
+    voiceOn: "Voice ON",
+    voiceOff: "Voice OFF",
+    voiceReady: "Voice ready. I will put the transcript in the box first.",
+    voiceEdit: "Transcript added. Check it, then press Send.",
     selectedLanguage: "English",
-    chatPlaceholder: "Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?",
     send: "Send",
-    symptomLabels: ["Headache", "Vomiting", "Dizziness", "Eye irritation", "Breathing difficulty", "Heavy sweating", "Muscle twitching", "Confusion"],
+    analyzing: "Analyzing photo...",
+    imageDefault: "Image analysis result will appear here.",
+    imageAnalysis: "Image Analysis",
+    noImage: "Choose or capture a pesticide label photo first.",
+    imageHelp: "Tip: for best accuracy, crop the label so the product name and active ingredient are readable. If OCR misses it, type the visible text in the notes box.",
   },
   hi: {
-    eyebrow: "रासायनिक डी-कंटैमिनेशन अलर्ट सिस्टम",
     language: "भाषा",
-    helpline: "भारत poison helpline: 1800-116-117",
-    chemicalTitle: "रसायन पहचान",
-    chemicalDesc: "बोतल, बैग या label पर लिखा pesticide/chemical नाम डालें.",
-    chemicalPlaceholder: "उदाहरण: chlorpyrifos, paraquat, glyphosate",
-    check: "जांचें",
-    chemicalResult: "रसायन risk details यहां दिखेंगे.",
-    imageTitle: "Pesticide फोटो analyzer",
-    imageDesc: "Pesticide label upload/capture करें. OCR न पढ़ पाए तो visible label text type करें.",
-    imageNotes: "Optional: label पर दिख रहा text लिखें, जैसे chlorpyrifos 20% EC",
-    analyzePhoto: "फोटो analyze करें",
-    imageResult: "Image analysis result यहां दिखेगा.",
-    checklistTitle: "Decontamination checklist",
-    checklistDesc: "Exposure type चुनें और घर जाने से पहले steps follow करें.",
-    skin: "त्वचा/कपड़े",
-    eyes: "आंखें",
-    breathing: "सांस",
-    symptomsTitle: "Symptom checker",
-    symptomsDesc: "Symptoms select करें या अपनी observation type करें.",
-    symptomText: "अन्य symptoms या क्या हुआ...",
-    analyzeSymptoms: "Symptoms analyze करें",
-    emergencyTitle: "Emergency alert",
-    emergencyDesc: "Chemical, symptoms और location वाला one-tap message बनाएं.",
-    contact: "Emergency contact phone number",
-    location: "Location जोड़ें",
-    createAlert: "Alert बनाएं",
-    emergencyMessage: "Emergency message यहां बनेगा.",
-    hospitalTitle: "Nearby hospital finder",
-    hospitalDesc: "Nearby hospital या poison support map search खोलें.",
-    nearestHospital: "नजदीकी hospital",
-    poisonCenter: "Poison control center",
-    callPoison: "1800-116-117 call करें",
-    chatTitle: "AgriAI chatbot",
-    chatDesc: "Local Ollama model चल रहा हो तो उससे powered.",
-    chatWelcome: "Chemical name, exposure कैसे हुआ, और symptoms बताइए. मैं next step बताऊंगा.",
-    voiceInput: "Voice input",
-    recordVoice: "Voice record",
-    voiceOn: "🔊 आवाज ON",
-    voiceOff: "🔇 आवाज OFF",
-    voiceStatus: "Voice आपके browser speech tools का उपयोग करता है.",
-    selectedLanguage: "हिंदी",
-    chatPlaceholder: "पूछें: मैंने chlorpyrifos spray किया और चक्कर आ रहा है, क्या करूं?",
+    helpline: "विष हेल्पलाइन: 1800-116-117",
+    voiceInput: "आवाज इनपुट",
+    recordVoice: "आवाज रिकॉर्ड",
+    voiceOn: "आवाज ON",
+    voiceOff: "आवाज OFF",
+    voiceReady: "आवाज तैयार है। पहले टेक्स्ट बॉक्स में transcript आएगा।",
+    voiceEdit: "Transcript जुड़ गया। जांचकर Send दबाएं।",
+    selectedLanguage: "हिन्दी",
     send: "भेजें",
-    symptomLabels: ["सिरदर्द", "उल्टी", "चक्कर", "आंख में जलन", "सांस की दिक्कत", "ज्यादा पसीना", "मांसपेशी फड़कना", "भ्रम"],
+    analyzing: "फोटो विश्लेषण हो रहा है...",
+    imageDefault: "फोटो विश्लेषण यहां दिखेगा।",
+    imageAnalysis: "फोटो विश्लेषण",
+    noImage: "पहले कीटनाशक लेबल की फोटो चुनें या खींचें।",
+    imageHelp: "सुझाव: सही पहचान के लिए लेबल में उत्पाद नाम और active ingredient साफ दिखना चाहिए। OCR छूटे तो दिखने वाला टेक्स्ट notes में लिखें।",
   },
   kn: {
-    eyebrow: "ರಾಸಾಯನಿಕ ಡೀಕಂಟಾಮಿನೇಶನ್ ಅಲರ್ಟ್ ವ್ಯವಸ್ಥೆ",
     language: "ಭಾಷೆ",
-    helpline: "ಭಾರತ poison helpline: 1800-116-117",
-    chemicalTitle: "ರಾಸಾಯನಿಕ ಗುರುತು",
-    chemicalDesc: "ಬಾಟಲ್, ಚೀಲ ಅಥವಾ label‌ನಲ್ಲಿರುವ pesticide/chemical ಹೆಸರನ್ನು ನಮೂದಿಸಿ.",
-    chemicalPlaceholder: "ಉದಾಹರಣೆ: chlorpyrifos, paraquat, glyphosate",
-    check: "ಪರಿಶೀಲಿಸಿ",
-    chemicalResult: "ರಾಸಾಯನಿಕ risk details ಇಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
-    imageTitle: "Pesticide ಫೋಟೋ analyzer",
-    imageDesc: "Pesticide label upload/capture ಮಾಡಿ. OCR ಓದಲು ಆಗದಿದ್ದರೆ label text type ಮಾಡಿ.",
-    imageNotes: "Optional: label‌ನಲ್ಲಿ ಕಾಣುವ text type ಮಾಡಿ, ಉದಾ: chlorpyrifos 20% EC",
-    analyzePhoto: "ಫೋಟೋ analyze ಮಾಡಿ",
-    imageResult: "Image analysis result ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
-    checklistTitle: "Decontamination checklist",
-    checklistDesc: "Exposure type ಆಯ್ಕೆ ಮಾಡಿ ಮತ್ತು ಮನೆಗೆ ಹೋಗುವ ಮೊದಲು steps follow ಮಾಡಿ.",
-    skin: "ಚರ್ಮ/ಬಟ್ಟೆ",
-    eyes: "ಕಣ್ಣುಗಳು",
-    breathing: "ಉಸಿರಾಟ",
-    symptomsTitle: "ಲಕ್ಷಣ checker",
-    symptomsDesc: "ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ ಅಥವಾ ನಿಮ್ಮ observation type ಮಾಡಿ.",
-    symptomText: "ಇತರೆ ಲಕ್ಷಣಗಳು ಅಥವಾ ಏನಾಯಿತು...",
-    analyzeSymptoms: "ಲಕ್ಷಣ analyze ಮಾಡಿ",
-    emergencyTitle: "Emergency alert",
-    emergencyDesc: "Chemical, symptoms ಮತ್ತು location ಇರುವ one-tap message ರಚಿಸಿ.",
-    contact: "Emergency contact phone number",
-    location: "Location ಬಳಸಿ",
-    createAlert: "Alert ರಚಿಸಿ",
-    emergencyMessage: "Emergency message ಇಲ್ಲಿ generate ಆಗುತ್ತದೆ.",
-    hospitalTitle: "ಹತ್ತಿರದ hospital finder",
-    hospitalDesc: "ನಿಮ್ಮ ಸ್ಥಳದ ಹತ್ತಿರ hospital ಅಥವಾ poison support map search ತೆರೆಯಿರಿ.",
-    nearestHospital: "ಹತ್ತಿರದ hospital",
-    poisonCenter: "Poison control center",
-    callPoison: "1800-116-117 ಕರೆ ಮಾಡಿ",
-    chatTitle: "AgriAI chatbot",
-    chatDesc: "Local Ollama model running ಇದ್ದರೆ ಅದರಿಂದ powered.",
-    chatWelcome: "Chemical name, exposure ಹೇಗೆ ಆಯಿತು, ಮತ್ತು symptoms ಹೇಳಿ. ನಾನು next step ಹೇಳುತ್ತೇನೆ.",
-    voiceInput: "Voice input",
-    recordVoice: "Voice record",
-    voiceOn: "🔊 ಧ್ವನಿ ON",
-    voiceOff: "🔇 ಧ್ವನಿ OFF",
-    voiceStatus: "Voice ನಿಮ್ಮ browser speech tools ಬಳಸುತ್ತದೆ.",
+    helpline: "ವಿಷ ಸಹಾಯವಾಣಿ: 1800-116-117",
+    voiceInput: "ಧ್ವನಿ ಇನ್‌ಪುಟ್",
+    recordVoice: "ಧ್ವನಿ ರೆಕಾರ್ಡ್",
+    voiceOn: "ಧ್ವನಿ ON",
+    voiceOff: "ಧ್ವನಿ OFF",
+    voiceReady: "ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ. ಮೊದಲು transcript ಪಠ್ಯ ಬಾಕ್ಸ್‌ಗೆ ಬರುತ್ತದೆ.",
+    voiceEdit: "Transcript ಸೇರಿಸಲಾಗಿದೆ. ಪರಿಶೀಲಿಸಿ Send ಒತ್ತಿರಿ.",
     selectedLanguage: "ಕನ್ನಡ",
-    chatPlaceholder: "ಕೇಳಿ: ನಾನು chlorpyrifos spray ಮಾಡಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ, ಏನು ಮಾಡಲಿ?",
     send: "ಕಳುಹಿಸಿ",
-    symptomLabels: ["ತಲೆನೋವು", "ವಾಂತಿ", "ತಲೆ ಸುತ್ತುವುದು", "ಕಣ್ಣು ಉರಿಯುವುದು", "ಉಸಿರಾಟದ ತೊಂದರೆ", "ಹೆಚ್ಚು ಬೆವರು", "ಮಾಂಸಖಂಡ twitching", "ಗೊಂದಲ"],
+    analyzing: "ಫೋಟೋ ವಿಶ್ಲೇಷಣೆ ನಡೆಯುತ್ತಿದೆ...",
+    imageDefault: "ಫೋಟೋ ವಿಶ್ಲೇಷಣೆ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+    imageAnalysis: "ಫೋಟೋ ವಿಶ್ಲೇಷಣೆ",
+    noImage: "ಮೊದಲು ಕೀಟನಾಶಕ ಲೇಬಲ್ ಫೋಟೋ ಆಯ್ಕೆ ಮಾಡಿ ಅಥವಾ ತೆಗೆದುಕೊಳ್ಳಿ.",
+    imageHelp: "ಸಲಹೆ: ಸರಿಯಾದ ಗುರುತಿಗಾಗಿ ಲೇಬಲ್‌ನಲ್ಲಿ ಉತ್ಪನ್ನದ ಹೆಸರು ಮತ್ತು active ingredient ಸ್ಪಷ್ಟವಾಗಿ ಕಾಣಬೇಕು. OCR ತಪ್ಪಿದರೆ ಕಾಣುವ ಪಠ್ಯವನ್ನು notes ನಲ್ಲಿ ಬರೆಯಿರಿ.",
   },
 };
 
-UI_TEXT.hi = {
-  ...UI_TEXT.en,
-  eyebrow: "रासायनिक सुरक्षा सहायक",
-  language: "भाषा",
-  helpline: "विष हेल्पलाइन: 1800-116-117",
-  chemicalTitle: "रसायन पहचान",
-  chemicalDesc: "बोतल, पैकेट या लेबल पर लिखा कीटनाशक/रसायन नाम डालें।",
-  chemicalPlaceholder: "उदाहरण: chlorpyrifos, paraquat, glyphosate",
-  check: "जांचें",
-  chemicalResult: "रसायन की जोखिम जानकारी यहां दिखेगी।",
-  imageTitle: "कीटनाशक फोटो विश्लेषक",
-  imageDesc: "लेबल की साफ फोटो अपलोड करें। OCR न पढ़े तो दिखने वाला टेक्स्ट लिखें।",
-  imageNotes: "लेबल पर दिखने वाला टेक्स्ट लिखें, जैसे chlorpyrifos 20% EC",
-  analyzePhoto: "फोटो विश्लेषण",
-  imageResult: "फोटो विश्लेषण यहां दिखेगा।",
-  checklistTitle: "डी-कंटैमिनेशन चेकलिस्ट",
-  checklistDesc: "संपर्क का प्रकार चुनें और घर जाने से पहले सभी कदम पूरे करें।",
-  skin: "त्वचा/कपड़े",
-  eyes: "आंखें",
-  breathing: "सांस",
-  symptomsTitle: "लक्षण जांच",
-  symptomsDesc: "लक्षण चुनें या अपनी बात लिखें।",
-  symptomText: "अन्य लक्षण या क्या हुआ...",
-  analyzeSymptoms: "लक्षण जांचें",
-  emergencyTitle: "आपात मदद",
-  emergencyDesc: "रसायन, लक्षण और स्थान के साथ आपात मार्गदर्शन बनाएं।",
-  location: "स्थान लें",
-  createAlert: "संदेश बनाएं",
-  emergencyMessage: "आपात संदेश यहां बनेगा।",
-  hospitalTitle: "नजदीकी अस्पताल",
-  hospitalDesc: "अपने स्थान के पास अस्पताल या विष सहायता खोजें।",
-  nearestHospital: "नजदीकी अस्पताल",
-  poisonCenter: "विष नियंत्रण केंद्र",
-  callPoison: "1800-116-117 कॉल करें",
-  chatTitle: "AgriAI सहायक",
-  chatDesc: "Ollama चल रहा हो तो स्थानीय AI मॉडल से जवाब मिलेगा।",
-  chatWelcome: "रसायन का नाम, संपर्क कैसे हुआ, और लक्षण बताइए।",
-  voiceInput: "आवाज इनपुट",
-  recordVoice: "आवाज रिकॉर्ड",
-  voiceOn: "Voice ON",
-  voiceOff: "Voice OFF",
-  voiceStatus: "आवाज इनपुट आपके ब्राउजर के speech tools से काम करता है।",
-  selectedLanguage: "हिन्दी",
-  chatPlaceholder: "पूछें: मैंने chlorpyrifos spray किया और चक्कर आ रहा है, क्या करूं?",
-  send: "भेजें",
-  symptomLabels: ["सिरदर्द", "उल्टी", "चक्कर", "आंख में जलन", "सांस की दिक्कत", "ज्यादा पसीना", "मांसपेशी फड़कना", "भ्रम"],
+const STATIC_TEXT = {
+  hi: {
+    "Dashboard": "डैशबोर्ड",
+    "Chatbot": "चैटबॉट",
+    "Identifier": "पहचान",
+    "Analyzer": "फोटो विश्लेषक",
+    "Checklist": "चेकलिस्ट",
+    "Symptoms": "लक्षण",
+    "Emergency": "आपातकाल",
+    "Hospital": "अस्पताल",
+    "Welcome to AgriAI": "AgriAI में आपका स्वागत है",
+    "Select a tool below to get started with pesticide safety, identification, and emergency assistance.": "कीटनाशक सुरक्षा, पहचान और आपात मदद के लिए नीचे एक टूल चुनें।",
+    "AgriAI Chatbot": "AgriAI सहायक",
+    "Ask questions and get instant AI guidance on pesticide exposure and safety.": "कीटनाशक संपर्क और सुरक्षा पर सवाल पूछें और तुरंत AI मार्गदर्शन पाएं।",
+    "Chemical Identifier": "रसायन पहचान",
+    "Enter a chemical name to quickly check its danger level and first aid steps.": "खतरा स्तर और प्राथमिक उपचार देखने के लिए रसायन का नाम डालें।",
+    "Photo Analyzer": "फोटो विश्लेषक",
+    "Upload a photo of a pesticide label to extract safety warnings and details.": "सुरक्षा चेतावनी और जानकारी निकालने के लिए कीटनाशक लेबल की फोटो अपलोड करें।",
+    "Decontamination": "डी-कंटैमिनेशन",
+    "Follow step-by-step instructions to safely wash off chemicals.": "रसायन को सुरक्षित रूप से धोने के लिए चरण-दर-चरण निर्देश अपनाएं।",
+    "Symptom Checker": "लक्षण जांच",
+    "Select your symptoms to determine if you need immediate medical help.": "तुरंत मेडिकल मदद चाहिए या नहीं, यह जानने के लिए लक्षण चुनें।",
+    "Emergency Alert": "आपात मदद",
+    "Generate a quick emergency message with your location and symptoms.": "स्थान और लक्षणों के साथ आपात संदेश बनाएं।",
+    "Hospital Finder": "अस्पताल खोजें",
+    "Find the nearest hospital or poison control center on the map.": "मैप पर नजदीकी अस्पताल या विष नियंत्रण केंद्र खोजें।",
+    "Ask naturally by text or voice. The answer stays focused on what you said.": "टेक्स्ट या आवाज से स्वाभाविक रूप से पूछें। जवाब आपकी बात पर ही केंद्रित रहेगा।",
+    "Tell me the pesticide name, how exposure happened, and symptoms. I will guide the next step.": "कीटनाशक का नाम, संपर्क कैसे हुआ और लक्षण बताइए। मैं अगला कदम बताऊंगा।",
+    "Pesticide Photo Analyzer": "कीटनाशक फोटो विश्लेषक",
+    "Upload a clear pesticide label. If OCR misses text, type the visible product name or active ingredient.": "कीटनाशक लेबल की साफ फोटो अपलोड करें। OCR छूटे तो उत्पाद नाम या active ingredient लिखें।",
+    "Analyze photo": "फोटो विश्लेषण",
+    "Image analysis result will appear here.": "फोटो विश्लेषण यहां दिखेगा।",
+    "Emergency Help": "आपात मदद",
+    "Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.": "रसायन, लक्षण और स्थान के साथ आपात मार्गदर्शन बनाएं। तुरंत मदद के लिए कॉल बटन इस्तेमाल करें।",
+    "Use location": "स्थान लें",
+    "Create message": "संदेश बनाएं",
+    "Call 112": "112 कॉल करें",
+    "Call poison helpline": "विष हेल्पलाइन कॉल करें",
+    "Nearby Hospital Finder": "नजदीकी अस्पताल खोजें",
+    "Nearest hospital": "नजदीकी अस्पताल",
+    "Poison control center": "विष नियंत्रण केंद्र",
+    "Call 1800-116-117": "1800-116-117 कॉल करें",
+  },
+  kn: {
+    "Dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+    "Chatbot": "ಚಾಟ್‌ಬಾಟ್",
+    "Identifier": "ಗುರುತು",
+    "Analyzer": "ಫೋಟೋ ವಿಶ್ಲೇಷಕ",
+    "Checklist": "ಚೆಕ್‌ಲಿಸ್ಟ್",
+    "Symptoms": "ಲಕ್ಷಣಗಳು",
+    "Emergency": "ತುರ್ತು",
+    "Hospital": "ಆಸ್ಪತ್ರೆ",
+    "Welcome to AgriAI": "AgriAI ಗೆ ಸ್ವಾಗತ",
+    "Select a tool below to get started with pesticide safety, identification, and emergency assistance.": "ಕೀಟನಾಶಕ ಸುರಕ್ಷತೆ, ಗುರುತಿಸುವಿಕೆ ಮತ್ತು ತುರ್ತು ಸಹಾಯಕ್ಕಾಗಿ ಕೆಳಗಿನ ಟೂಲ್ ಆಯ್ಕೆಮಾಡಿ.",
+    "AgriAI Chatbot": "AgriAI ಸಹಾಯಕ",
+    "Ask questions and get instant AI guidance on pesticide exposure and safety.": "ಕೀಟನಾಶಕ ಸಂಪರ್ಕ ಮತ್ತು ಸುರಕ್ಷತೆ ಬಗ್ಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿ, ತಕ್ಷಣ AI ಮಾರ್ಗದರ್ಶನ ಪಡೆಯಿರಿ.",
+    "Chemical Identifier": "ರಾಸಾಯನಿಕ ಗುರುತು",
+    "Enter a chemical name to quickly check its danger level and first aid steps.": "ಅಪಾಯ ಮಟ್ಟ ಮತ್ತು ಮೊದಲ ನೆರವು ನೋಡಲು ರಾಸಾಯನಿಕದ ಹೆಸರು ನಮೂದಿಸಿ.",
+    "Photo Analyzer": "ಫೋಟೋ ವಿಶ್ಲೇಷಕ",
+    "Upload a photo of a pesticide label to extract safety warnings and details.": "ಸುರಕ್ಷತಾ ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ವಿವರಗಳನ್ನು ಪಡೆಯಲು ಕೀಟನಾಶಕ ಲೇಬಲ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ.",
+    "Decontamination": "ಡೀಕಂಟಾಮಿನೇಶನ್",
+    "Follow step-by-step instructions to safely wash off chemicals.": "ರಾಸಾಯನಿಕವನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ತೊಳೆಯಲು ಹಂತ ಹಂತದ ಸೂಚನೆಗಳನ್ನು ಅನುಸರಿಸಿ.",
+    "Symptom Checker": "ಲಕ್ಷಣ ಪರಿಶೀಲನೆ",
+    "Select your symptoms to determine if you need immediate medical help.": "ತಕ್ಷಣ ವೈದ್ಯಕೀಯ ಸಹಾಯ ಬೇಕೇ ಎಂದು ತಿಳಿಯಲು ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "Emergency Alert": "ತುರ್ತು ಸಹಾಯ",
+    "Generate a quick emergency message with your location and symptoms.": "ನಿಮ್ಮ ಸ್ಥಳ ಮತ್ತು ಲಕ್ಷಣಗಳೊಂದಿಗೆ ತುರ್ತು ಸಂದೇಶ ರಚಿಸಿ.",
+    "Hospital Finder": "ಆಸ್ಪತ್ರೆ ಹುಡುಕಿ",
+    "Find the nearest hospital or poison control center on the map.": "ಮ್ಯಾಪ್‌ನಲ್ಲಿ ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ ಅಥವಾ ವಿಷ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ ಹುಡುಕಿ.",
+    "Ask naturally by text or voice. The answer stays focused on what you said.": "ಟೆಕ್ಸ್ಟ್ ಅಥವಾ ಧ್ವನಿಯಿಂದ ಸಹಜವಾಗಿ ಕೇಳಿ. ಉತ್ತರ ನಿಮ್ಮ ಮಾತಿನ ಮೇಲೆಯೇ ಕೇಂದ್ರೀಕರಿಸುತ್ತದೆ.",
+    "Tell me the pesticide name, how exposure happened, and symptoms. I will guide the next step.": "ಕೀಟನಾಶಕದ ಹೆಸರು, ಸಂಪರ್ಕ ಹೇಗೆ ಆಯಿತು ಮತ್ತು ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. ಮುಂದಿನ ಹಂತವನ್ನು ಹೇಳುತ್ತೇನೆ.",
+    "Pesticide Photo Analyzer": "ಕೀಟನಾಶಕ ಫೋಟೋ ವಿಶ್ಲೇಷಕ",
+    "Upload a clear pesticide label. If OCR misses text, type the visible product name or active ingredient.": "ಸ್ಪಷ್ಟ ಕೀಟನಾಶಕ ಲೇಬಲ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ. OCR ತಪ್ಪಿದರೆ ಉತ್ಪನ್ನದ ಹೆಸರು ಅಥವಾ active ingredient ಬರೆಯಿರಿ.",
+    "Analyze photo": "ಫೋಟೋ ವಿಶ್ಲೇಷಿಸಿ",
+    "Image analysis result will appear here.": "ಫೋಟೋ ವಿಶ್ಲೇಷಣೆ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+    "Emergency Help": "ತುರ್ತು ಸಹಾಯ",
+    "Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.": "ರಾಸಾಯನಿಕ, ಲಕ್ಷಣಗಳು ಮತ್ತು ಸ್ಥಳದೊಂದಿಗೆ ತುರ್ತು ಮಾರ್ಗದರ್ಶನ ರಚಿಸಿ. ತುರ್ತು ಸಹಾಯಕ್ಕೆ ಕರೆ ಬಟನ್ ಬಳಸಿ.",
+    "Use location": "ಸ್ಥಳ ಬಳಸಿ",
+    "Create message": "ಸಂದೇಶ ರಚಿಸಿ",
+    "Call 112": "112 ಕರೆ ಮಾಡಿ",
+    "Call poison helpline": "ವಿಷ ಸಹಾಯವಾಣಿಗೆ ಕರೆ ಮಾಡಿ",
+    "Nearby Hospital Finder": "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ ಹುಡುಕಿ",
+    "Nearest hospital": "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ",
+    "Poison control center": "ವಿಷ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ",
+    "Call 1800-116-117": "1800-116-117 ಕರೆ ಮಾಡಿ",
+  },
 };
 
-UI_TEXT.kn = {
-  ...UI_TEXT.en,
-  eyebrow: "ರಾಸಾಯನಿಕ ಸುರಕ್ಷತಾ ಸಹಾಯಕ",
-  language: "ಭಾಷೆ",
-  helpline: "ವಿಷ ಸಹಾಯವಾಣಿ: 1800-116-117",
-  chemicalTitle: "ರಾಸಾಯನಿಕ ಗುರುತು",
-  chemicalDesc: "ಬಾಟಲ್, ಪ್ಯಾಕೆಟ್ ಅಥವಾ ಲೇಬಲ್‌ನಲ್ಲಿರುವ ಕೀಟನಾಶಕ/ರಾಸಾಯನಿಕ ಹೆಸರನ್ನು ನಮೂದಿಸಿ.",
-  chemicalPlaceholder: "ಉದಾಹರಣೆ: chlorpyrifos, paraquat, glyphosate",
-  check: "ಪರಿಶೀಲಿಸಿ",
-  chemicalResult: "ರಾಸಾಯನಿಕದ ಅಪಾಯ ಮಾಹಿತಿ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
-  imageTitle: "ಕೀಟನಾಶಕ ಫೋಟೋ ವಿಶ್ಲೇಷಕ",
-  imageDesc: "ಸ್ಪಷ್ಟ ಲೇಬಲ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ. OCR ಓದದಿದ್ದರೆ ಕಾಣುವ ಪಠ್ಯವನ್ನು ಬರೆಯಿರಿ.",
-  imageNotes: "ಲೇಬಲ್‌ನಲ್ಲಿ ಕಾಣುವ ಪಠ್ಯ ಬರೆಯಿರಿ, ಉದಾ: chlorpyrifos 20% EC",
-  analyzePhoto: "ಫೋಟೋ ವಿಶ್ಲೇಷಿಸಿ",
-  imageResult: "ಫೋಟೋ ವಿಶ್ಲೇಷಣೆ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
-  checklistTitle: "ಡೀಕಂಟಾಮಿನೇಶನ್ ಚೆಕ್‌ಲಿಸ್ಟ್",
-  checklistDesc: "ಸಂಪರ್ಕದ ಪ್ರಕಾರ ಆಯ್ಕೆ ಮಾಡಿ ಮತ್ತು ಮನೆಗೆ ಹೋಗುವ ಮೊದಲು ಎಲ್ಲಾ ಹಂತಗಳನ್ನು ಅನುಸರಿಸಿ.",
-  skin: "ಚರ್ಮ/ಬಟ್ಟೆ",
-  eyes: "ಕಣ್ಣುಗಳು",
-  breathing: "ಉಸಿರಾಟ",
-  symptomsTitle: "ಲಕ್ಷಣ ಪರಿಶೀಲನೆ",
-  symptomsDesc: "ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಿ ಅಥವಾ ಏನಾಯಿತು ಎಂದು ಬರೆಯಿರಿ.",
-  symptomText: "ಇತರ ಲಕ್ಷಣಗಳು ಅಥವಾ ಏನಾಯಿತು...",
-  analyzeSymptoms: "ಲಕ್ಷಣ ಪರಿಶೀಲಿಸಿ",
-  emergencyTitle: "ತುರ್ತು ಸಹಾಯ",
-  emergencyDesc: "ರಾಸಾಯನಿಕ, ಲಕ್ಷಣಗಳು ಮತ್ತು ಸ್ಥಳದೊಂದಿಗೆ ತುರ್ತು ಮಾರ್ಗದರ್ಶನ ರಚಿಸಿ.",
-  location: "ಸ್ಥಳ ಬಳಸಿ",
-  createAlert: "ಸಂದೇಶ ರಚಿಸಿ",
-  emergencyMessage: "ತುರ್ತು ಸಂದೇಶ ಇಲ್ಲಿ ರಚಿಸಲಾಗುತ್ತದೆ.",
-  hospitalTitle: "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ",
-  hospitalDesc: "ನಿಮ್ಮ ಸ್ಥಳದ ಹತ್ತಿರ ಆಸ್ಪತ್ರೆ ಅಥವಾ ವಿಷ ಸಹಾಯ ಹುಡುಕಿ.",
-  nearestHospital: "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ",
-  poisonCenter: "ವಿಷ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ",
-  callPoison: "1800-116-117 ಕರೆ ಮಾಡಿ",
-  chatTitle: "AgriAI ಸಹಾಯಕ",
-  chatDesc: "Ollama ಚಾಲನೆಯಲ್ಲಿದ್ದರೆ ಸ್ಥಳೀಯ AI ಮಾದರಿಯಿಂದ ಉತ್ತರ ಬರುತ್ತದೆ.",
-  chatWelcome: "ರಾಸಾಯನಿಕದ ಹೆಸರು, ಸಂಪರ್ಕ ಹೇಗೆ ಆಯಿತು, ಮತ್ತು ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ.",
-  voiceInput: "ಧ್ವನಿ ಇನ್‌ಪುಟ್",
-  recordVoice: "ಧ್ವನಿ ರೆಕಾರ್ಡ್",
-  voiceOn: "Voice ON",
-  voiceOff: "Voice OFF",
-  voiceStatus: "ಧ್ವನಿ ಇನ್‌ಪುಟ್ ನಿಮ್ಮ ಬ್ರೌಸರ್ speech tools ಬಳಸಿ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
-  selectedLanguage: "ಕನ್ನಡ",
-  chatPlaceholder: "ಕೇಳಿ: ನಾನು chlorpyrifos spray ಮಾಡಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ, ಏನು ಮಾಡಲಿ?",
-  send: "ಕಳುಹಿಸಿ",
-  symptomLabels: ["ತಲೆನೋವು", "ವಾಂತಿ", "ತಲೆ ಸುತ್ತುವುದು", "ಕಣ್ಣು ಉರಿ", "ಉಸಿರಾಟ ತೊಂದರೆ", "ಹೆಚ್ಚು ಬೆವರು", "ಮಾಂಸಖಂಡ ಫಡಕುವುದು", "ಗೊಂದಲ"],
-};
+document.addEventListener("DOMContentLoaded", init);
+
+function init() {
+  if (el.languageSelect) {
+    el.languageSelect.value = localStorage.getItem("agriaiLanguage") || "auto";
+    el.languageSelect.addEventListener("change", () => {
+      localStorage.setItem("agriaiLanguage", el.languageSelect.value);
+      applyLanguage();
+    });
+  }
+
+  bindEvents();
+  setupSpeechRecognition();
+  applyLanguage();
+  if (el.checklist) loadChecklist("skin");
+}
+
+function bindEvents() {
+  on(el.lookupBtn, "click", lookupChemical);
+  on(el.chemicalInput, "keydown", (event) => {
+    if (event.key === "Enter" && el.lookupBtn) lookupChemical();
+  });
+  on(el.symptomBtn, "click", analyzeSymptoms);
+  on(el.locationBtn, "click", useLocation);
+  on(el.alertBtn, "click", createAlert);
+  on(el.chatBtn, "click", sendChat);
+  on(el.chatInput, "input", () => updateAutoLanguageFromText(el.chatInput.value));
+  on(el.chatInput, "keydown", (event) => {
+    if (event.key === "Enter") sendChat();
+  });
+  on(el.micBtn, "click", startVoiceInput);
+  on(el.recordBtn, "click", toggleRecording);
+  on(el.voiceToggleBtn, "click", toggleVoiceReply);
+  on(el.imageInput, "change", previewImage);
+  on(el.imageAnalyzeBtn, "click", analyzeImage);
+
+  $$(".segment").forEach((button) => {
+    button.addEventListener("click", () => {
+      $$(".segment").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      loadChecklist(button.dataset.exposure || "skin");
+    });
+  });
+}
+
+function on(node, eventName, handler) {
+  if (node) node.addEventListener(eventName, handler);
+}
+
+function currentLanguage() {
+  return el.languageSelect?.value || "auto";
+}
 
 function uiLanguage() {
   const selected = currentLanguage();
-  if (selected === "auto") return detectedAutoLanguage;
-  return selected;
+  return selected === "auto" ? state.detectedAutoLanguage : selected;
 }
 
-function detectInputLanguage(text) {
-  if (containsKannada(text)) return "kn";
-  if (containsDevanagari(text)) return "hi";
-  return "en";
+function applyLanguage() {
+  const lang = uiLanguage();
+  const text = UI_TEXT[lang] || UI_TEXT.en;
+  document.documentElement.lang = lang;
+  translateStaticText(lang);
+
+  const languageControl = $(".language-control");
+  if (languageControl?.firstChild) languageControl.firstChild.textContent = `${text.language} `;
+  const helpline = $(".helpline");
+  if (helpline) helpline.textContent = text.helpline;
+  if (el.micBtn) el.micBtn.textContent = text.voiceInput;
+  if (el.recordBtn && mediaRecorder?.state !== "recording") el.recordBtn.textContent = text.recordVoice;
+  if (el.voiceToggleBtn) {
+    el.voiceToggleBtn.textContent = state.voiceEnabled ? text.voiceOn : text.voiceOff;
+    el.voiceToggleBtn.classList.toggle("off", !state.voiceEnabled);
+    el.voiceToggleBtn.setAttribute("aria-pressed", String(state.voiceEnabled));
+  }
+  if (el.selectedLanguageStatus) {
+    el.selectedLanguageStatus.textContent = currentLanguage() === "auto" ? `Auto: ${text.selectedLanguage}` : text.selectedLanguage;
+  }
+  if (el.voiceStatus && !el.voiceStatus.dataset.locked) el.voiceStatus.textContent = text.voiceReady;
+  if (el.chatBtn) el.chatBtn.textContent = text.send;
+  if (el.imageResult?.classList.contains("muted")) el.imageResult.textContent = text.imageDefault;
+}
+
+function translateStaticText(lang) {
+  const dictionary = STATIC_TEXT[lang] || {};
+  $$("h2, h3, p, a.nav-tab, a.button-link, button.dashboard-card .card-title, .dashboard-card p, .bot.bubble").forEach((node) => {
+    const original = node.dataset.i18nSource || node.textContent.trim();
+    node.dataset.i18nSource = original;
+    node.textContent = lang === "en" ? original : (dictionary[original] || original);
+  });
+  $$("button, a").forEach((node) => {
+    const original = node.dataset.i18nSource || node.textContent.trim();
+    node.dataset.i18nSource = original;
+    node.textContent = lang === "en" ? original : (dictionary[original] || original);
+  });
 }
 
 function updateAutoLanguageFromText(text) {
   if (currentLanguage() !== "auto") return;
-  detectedAutoLanguage = detectInputLanguage(text);
-  applyUILanguage();
-}
-
-function applyUILanguage() {
-  const text = UI_TEXT[uiLanguage()] || UI_TEXT.en;
-  document.documentElement.lang = uiLanguage();
-  document.querySelector(".eyebrow").textContent = text.eyebrow;
-  document.querySelector(".language-control").firstChild.textContent = `${text.language} `;
-  document.querySelector(".helpline").textContent = text.helpline;
-  chemicalInput.placeholder = text.chemicalPlaceholder;
-  lookupBtn.textContent = text.check;
-  if (chemicalResult.classList.contains("muted")) chemicalResult.textContent = text.chemicalResult;
-  imageNotes.placeholder = text.imageNotes;
-  imageAnalyzeBtn.textContent = text.analyzePhoto;
-  if (imageResult.classList.contains("muted")) imageResult.textContent = text.imageResult;
-  symptomText.placeholder = text.symptomText;
-  symptomBtn.textContent = text.analyzeSymptoms;
-  locationBtn.textContent = text.location;
-  alertBtn.textContent = text.createAlert;
-  emergencyMessage.placeholder = text.emergencyMessage;
-  hospitalLink.textContent = text.nearestHospital;
-  document.querySelector('a[href="https://www.google.com/maps/search/poison+control+center"]').textContent = text.poisonCenter;
-  document.querySelector(".hospital-actions a[href='tel:1800116117']").textContent = text.callPoison;
-  micBtn.textContent = text.voiceInput;
-  recordBtn.textContent = text.recordVoice;
-  voiceToggleBtn.textContent = voiceEnabled ? text.voiceOn : text.voiceOff;
-  voiceToggleBtn.setAttribute("aria-pressed", String(voiceEnabled));
-  voiceToggleBtn.classList.toggle("off", !voiceEnabled);
-  voiceStatus.textContent = text.voiceStatus;
-  selectedLanguageStatus.textContent = text.selectedLanguage;
-  chatInput.placeholder = text.chatPlaceholder;
-  chatBtn.textContent = text.send;
-  const headings = document.querySelectorAll("h2");
-  headings[0].textContent = text.chemicalTitle;
-  headings[1].textContent = text.imageTitle;
-  headings[2].textContent = text.checklistTitle;
-  headings[3].textContent = text.symptomsTitle;
-  headings[4].textContent = text.emergencyTitle;
-  headings[5].textContent = text.hospitalTitle;
-  headings[6].textContent = text.chatTitle;
-  const descriptions = document.querySelectorAll(".section-title p");
-  descriptions[0].textContent = text.chemicalDesc;
-  descriptions[1].textContent = text.imageDesc;
-  descriptions[2].textContent = text.checklistDesc;
-  descriptions[3].textContent = text.symptomsDesc;
-  descriptions[4].textContent = text.emergencyDesc;
-  descriptions[5].textContent = text.hospitalDesc;
-  descriptions[6].textContent = text.chatDesc;
-  document.querySelector('[data-exposure="skin"]').textContent = text.skin;
-  document.querySelector('[data-exposure="eye"]').textContent = text.eyes;
-  document.querySelector('[data-exposure="inhalation"]').textContent = text.breathing;
-  document.querySelectorAll(".symptom-grid label").forEach((label, index) => {
-    const input = label.querySelector("input");
-    label.textContent = "";
-    label.appendChild(input);
-    label.append(` ${text.symptomLabels[index] || input.value}`);
-  });
-  const firstBot = chatLog.querySelector(".bot.bubble");
-  if (chatHistory.length === 0 && firstBot) firstBot.textContent = text.chatWelcome;
-}
-
-function dangerClass(level) {
-  if (level === "Extreme" || level === "High") return "danger";
-  if (level === "Moderate" || level === "Low to Moderate") return "warning";
-  return "safe";
+  if (containsKannada(text)) state.detectedAutoLanguage = "kn";
+  else if (containsDevanagari(text)) state.detectedAutoLanguage = "hi";
+  else state.detectedAutoLanguage = "en";
+  applyLanguage();
 }
 
 function selectedSymptoms() {
-  const checked = [...document.querySelectorAll(".symptom-grid input:checked")].map((input) => input.value);
-  if (symptomText.value.trim()) checked.push(symptomText.value.trim());
+  const checked = $$(".symptom-grid input:checked").map((input) => input.value);
+  if (el.symptomText?.value.trim()) checked.push(el.symptomText.value.trim());
   return checked;
 }
 
-function renderChemical(data) {
-  if (!data.found) {
-    chemicalResult.innerHTML = `<strong>Not found.</strong> ${data.message}`;
-    return;
-  }
-
-  const chemical = data.chemical;
-  chemicalResult.innerHTML = `
-    <strong>${chemical.name}</strong>
-    <div>Category: ${chemical.category}</div>
-    <div>Danger level: <span class="${dangerClass(chemical.danger_level)}">${chemical.danger_level}</span></div>
-    <div>Common symptoms: ${chemical.symptoms.join(", ")}</div>
-    <div>First aid: ${chemical.first_aid}</div>
-    <div class="muted">${chemical.notes}</div>
-  `;
+function dangerClass(level = "") {
+  if (["Extreme", "High", "Emergency"].includes(level)) return "danger";
+  if (String(level).includes("Moderate") || level === "High concern") return "warning";
+  return "safe";
 }
 
 async function lookupChemical() {
-  const name = chemicalInput.value.trim();
-  if (!name) {
-    chemicalResult.textContent = "Enter the chemical name first.";
-    return;
+  const name = el.chemicalInput?.value.trim();
+  if (!name) return setResult(el.chemicalResult, "Enter the chemical name first.", true);
+  try {
+    const response = await fetch(`/api/chemical?name=${encodeURIComponent(name)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Chemical not found.");
+    const chemical = data.chemical;
+    el.chemicalResult.className = "result-box";
+    el.chemicalResult.innerHTML = `
+      <strong>${escapeHtml(chemical.name)}</strong>
+      <div>Category: ${escapeHtml(chemical.category || "Unknown")}</div>
+      <div>Danger level: <span class="${dangerClass(chemical.danger_level)}">${escapeHtml(chemical.danger_level || "Unknown")}</span></div>
+      <div>Common symptoms: ${escapeHtml((chemical.symptoms || []).join(", ") || "Unknown")}</div>
+      <div>First aid: ${escapeHtml(chemical.first_aid || "Seek medical advice if symptoms appear.")}</div>
+    `;
+  } catch (error) {
+    setResult(el.chemicalResult, error.message, true);
   }
-
-  const response = await fetch(`/api/chemical?name=${encodeURIComponent(name)}`);
-  const data = await response.json();
-  renderChemical(data);
 }
 
 async function loadChecklist(type = "skin") {
-  const response = await fetch(`/api/decontamination?type=${encodeURIComponent(type)}`);
-  const data = await response.json();
-  checklist.innerHTML = data.steps
-    .map((step) => `<li><strong>${step.title}</strong><span>${step.detail}</span></li>`)
-    .join("");
+  if (!el.checklist) return;
+  try {
+    const response = await fetch(`/api/decontamination?type=${encodeURIComponent(type)}`);
+    const data = await response.json();
+    el.checklist.innerHTML = data.steps.map((step) => `<li><strong>${escapeHtml(step.title)}</strong><span>${escapeHtml(step.detail)}</span></li>`).join("");
+  } catch {
+    el.checklist.innerHTML = "<li>Could not load checklist.</li>";
+  }
 }
 
 async function analyzeSymptoms() {
   const symptoms = selectedSymptoms();
-  if (!symptoms.length) {
-    symptomResult.textContent = "Select or type at least one symptom.";
-    return;
+  if (!symptoms.length) return setResult(el.symptomResult, "Select or type at least one symptom.", true);
+  try {
+    const response = await fetch("/api/symptoms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chemical: el.chemicalInput?.value || "", symptoms }),
+    });
+    const data = await response.json();
+    el.symptomResult.className = "result-box";
+    el.symptomResult.innerHTML = `
+      <strong class="${dangerClass(data.level)}">${escapeHtml(data.level)}</strong>
+      <div>${escapeHtml(data.action)}</div>
+      <div class="muted">Matched symptoms: ${escapeHtml((data.matched_symptoms || []).join(", ") || "none from high-risk list")}</div>
+    `;
+  } catch (error) {
+    setResult(el.symptomResult, error.message, true);
   }
-
-  const response = await fetch("/api/symptoms", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chemical: chemicalInput.value, symptoms }),
-  });
-  const data = await response.json();
-  const className = data.level === "Emergency" ? "danger" : data.level === "High concern" ? "warning" : "safe";
-  symptomResult.innerHTML = `
-    <strong class="${className}">${data.level}</strong>
-    <div>${data.action}</div>
-    <div class="muted">Matched symptoms: ${data.matched_symptoms.length ? data.matched_symptoms.join(", ") : "none from high-risk list"}</div>
-  `;
-}
-
-function updateMapLinks(latitude, longitude) {
-  const query = `${latitude},${longitude} nearest hospital`;
-  hospitalLink.href = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
 }
 
 function useLocation() {
@@ -428,240 +358,79 @@ function useLocation() {
     selectedLocation = "GPS not supported";
     return;
   }
-
-  locationBtn.textContent = "Finding location...";
+  if (el.locationBtn) el.locationBtn.textContent = "Finding location...";
   navigator.geolocation.getCurrentPosition(
     (position) => {
       const { latitude, longitude } = position.coords;
       selectedLocation = `https://www.google.com/maps?q=${latitude},${longitude}`;
-      updateMapLinks(latitude, longitude);
-      locationBtn.textContent = "Location added";
+      if (el.hospitalLink) el.hospitalLink.href = `https://www.google.com/maps/search/${encodeURIComponent(`${latitude},${longitude} nearest hospital`)}`;
+      if (el.locationBtn) el.locationBtn.textContent = "Location added";
     },
     () => {
       selectedLocation = "Location permission denied";
-      locationBtn.textContent = "Use location";
+      if (el.locationBtn) el.locationBtn.textContent = "Use location";
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
 }
 
 async function createAlert() {
-  const symptoms = selectedSymptoms().join(", ") || "not provided";
-  const response = await fetch("/api/emergency-message", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chemical: chemicalInput.value || "unknown chemical",
-      symptoms,
-      location: selectedLocation || "location unavailable",
-    }),
-  });
-  const data = await response.json();
-  emergencyMessage.value = data.message;
-
-  alertBtn.textContent = "Message ready";
+  if (!el.emergencyMessage) return;
+  const symptoms = selectedSymptoms().join(", ") || el.symptomText?.value || "not provided";
+  try {
+    const response = await fetch("/api/emergency-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chemical: el.chemicalInput?.value || "unknown chemical",
+        symptoms,
+        location: selectedLocation || "location unavailable",
+      }),
+    });
+    const data = await response.json();
+    el.emergencyMessage.value = data.message;
+    if (el.alertBtn) el.alertBtn.textContent = "Message ready";
+  } catch {
+    el.emergencyMessage.value = "Could not create emergency message. Call 112 or 1800-116-117 if symptoms are serious.";
+  }
 }
 
 function addMessage(text, type) {
   const bubble = document.createElement("div");
   bubble.className = `${type} bubble`;
   bubble.textContent = text;
-  chatLog.appendChild(bubble);
-  chatLog.scrollTop = chatLog.scrollHeight;
+  el.chatLog.appendChild(bubble);
+  el.chatLog.scrollTop = el.chatLog.scrollHeight;
   return bubble;
 }
 
-function currentLanguage() {
-  return languageSelect.value;
-}
-
-function browserSpeechLanguage() {
-  const language = currentLanguage();
-  if (language === "kn") return "kn-IN";
-  if (language === "hi") return "hi-IN";
-  if (language === "en") return "en-IN";
-  if (containsKannada(chatInput.value)) return "kn-IN";
-  if (containsDevanagari(chatInput.value)) return "hi-IN";
-  return "en-IN";
-}
-
-function containsKannada(text) {
-  return /[\u0c80-\u0cff]/.test(text);
-}
-
-function containsDevanagari(text) {
-  return /[\u0900-\u097f]/.test(text);
-}
-
-function speakText(text) {
-  if (!voiceEnabled) {
-    stopSpeaking();
-    return;
-  }
-  if (!("speechSynthesis" in window)) {
-    speakWithServerTTS(text);
-    return;
-  }
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  const language = currentLanguage();
-  utterance.lang = language === "kn" || containsKannada(text) ? "kn-IN" : language === "hi" || containsDevanagari(text) ? "hi-IN" : "en-IN";
-  const voice = chooseVoice(utterance.lang);
-  if (voice) utterance.voice = voice;
-  utterance.rate = 0.95;
-  utterance.onerror = () => speakWithServerTTS(text);
-  window.speechSynthesis.speak(utterance);
-  voiceStatus.textContent = `Speaking in ${utterance.lang}.`;
-}
-
-function chooseVoice(lang) {
-  const voices = window.speechSynthesis.getVoices();
-  return voices.find((voice) => voice.lang === lang) || voices.find((voice) => voice.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
-}
-
-async function speakWithServerTTS(text) {
-  if (!voiceEnabled) return;
-  try {
-    const response = await fetch("/api/text-to-speech", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, language: uiLanguage() }),
-    });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (!data.audio_base64) return;
-    if (fallbackAudio) fallbackAudio.pause();
-    fallbackAudio = new Audio(`data:${data.mime_type};base64,${data.audio_base64}`);
-    fallbackAudio.play();
-    voiceStatus.textContent = `Speaking in ${data.language}.`;
-  } catch {
-    voiceStatus.textContent = "Voice output is unavailable in this browser.";
-  }
-}
-
-function stopSpeaking() {
-  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-  if (fallbackAudio) {
-    fallbackAudio.pause();
-    fallbackAudio.currentTime = 0;
-  }
-}
-
-function toggleVoiceReply() {
-  voiceEnabled = !voiceEnabled;
-  localStorage.setItem("agriaiVoiceEnabled", String(voiceEnabled));
-  if (!voiceEnabled) stopSpeaking();
-  applyUILanguage();
-  voiceStatus.textContent = voiceEnabled ? "Voice reply enabled." : "Voice reply stopped.";
-}
-
-function setupSpeechRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    micBtn.disabled = true;
-    voiceStatus.textContent = "Browser voice input is not supported here. Use Record voice or type.";
-    return;
-  }
-
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 3;
-
-  recognition.onstart = () => {
-    micBtn.textContent = "Listening...";
-    micBtn.classList.add("listening");
-    voiceStatus.textContent = "Speak now.";
-  };
-
-  recognition.onresult = (event) => {
-    let transcript = "";
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      transcript += event.results[index][0].transcript;
-    }
-    chatInput.value = transcript;
-    updateAutoLanguageFromText(transcript);
-    voiceStatus.textContent = event.results[event.results.length - 1].isFinal ? `Heard: ${transcript}` : `Listening: ${transcript}`;
-    chatInput.focus();
-  };
-
-  recognition.onerror = () => {
-    voiceStatus.textContent = "Voice input failed. Try typing or allow microphone access.";
-  };
-
-  recognition.onend = () => {
-    micBtn.textContent = "Voice input";
-    micBtn.classList.remove("listening");
-    applyUILanguage();
-  };
-}
-
-async function toggleRecording() {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
-    return;
-  }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    voiceStatus.textContent = "Recording is not supported in this browser.";
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) recordedChunks.push(event.data);
-    };
-    mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach((track) => track.stop());
-      recordBtn.textContent = "Record voice";
-      recordBtn.classList.remove("recording");
-      await transcribeRecording();
-    };
-    mediaRecorder.start();
-    recordBtn.textContent = "Stop recording";
-    recordBtn.classList.add("recording");
-    voiceStatus.textContent = "Recording... speak now.";
-  } catch {
-    voiceStatus.textContent = "Microphone permission denied or unavailable.";
-  }
-}
-
-async function transcribeRecording() {
-  const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
-  const formData = new FormData();
-  formData.append("audio", audioBlob, "voice.webm");
-  formData.append("language", currentLanguage());
-  voiceStatus.textContent = "Converting voice to text...";
-
-  try {
-    const response = await fetch("/api/speech-to-text", { method: "POST", body: formData });
-    const data = await response.json();
-    if (!response.ok || !data.text) throw new Error(data.error || "No text");
-    chatInput.value = data.text;
-    updateAutoLanguageFromText(data.text);
-    voiceStatus.textContent = `Heard: ${data.text}`;
-  } catch {
-    voiceStatus.textContent = "Server voice recognition is unavailable. Try browser Voice input or type.";
-  }
-}
-
 async function sendChat() {
-  const message = chatInput.value.trim();
-  if (!message) return;
+  const message = el.chatInput?.value.trim();
+  if (!message || !el.chatLog) return;
   updateAutoLanguageFromText(message);
 
   addMessage(message, "user");
-  chatHistory.push({ role: "user", content: message });
-  chatInput.value = "";
-  chatBtn.disabled = true;
-  chatBtn.textContent = "Sending";
-  const pending = addMessage("Generating reply...", "bot");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 105000);
+  state.chatHistory.push({ role: "user", content: message });
+  el.chatInput.value = "";
+  el.chatBtn.disabled = true;
+  el.chatBtn.textContent = "Sending...";
+  const pending = addMessage("Thinking...", "bot");
 
+  try {
+    await streamChat(message, pending);
+  } catch {
+    await fallbackChat(message, pending);
+  } finally {
+    el.chatBtn.disabled = false;
+    applyLanguage();
+    state.chatHistory.push({ role: "assistant", content: pending.textContent });
+    speakText(pending.textContent);
+  }
+}
+
+async function streamChat(message, bubble) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch("/api/chat-stream", {
       method: "POST",
@@ -669,16 +438,14 @@ async function sendChat() {
       signal: controller.signal,
       body: JSON.stringify({
         message,
-        chemical: chemicalInput.value,
+        chemical: el.chemicalInput?.value || "",
         symptoms: "",
-        history: chatHistory.slice(-8),
+        history: state.chatHistory.slice(-8),
         language: currentLanguage(),
       }),
     });
-    if (!response.ok || !response.body) {
-      throw new Error("stream unavailable");
-    }
-    pending.textContent = "";
+    if (!response.ok || !response.body) throw new Error("stream unavailable");
+    bubble.textContent = "";
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -691,99 +458,238 @@ async function sendChat() {
       for (const event of events) {
         const line = event.split("\n").find((item) => item.startsWith("data: "));
         if (!line) continue;
-        const dataText = line.slice(6);
-        if (dataText === "[DONE]") continue;
+        const payload = line.slice(6);
+        if (payload === "[DONE]") continue;
         try {
-          const data = JSON.parse(dataText);
-          pending.textContent += data.token || "";
-          chatLog.scrollTop = chatLog.scrollHeight;
+          bubble.textContent += JSON.parse(payload).token || "";
         } catch {
-          pending.textContent += dataText;
+          bubble.textContent += payload;
         }
+        el.chatLog.scrollTop = el.chatLog.scrollHeight;
       }
     }
-    if (!pending.textContent.trim()) {
-      pending.textContent = "I could not create a reply. Please enter the chemical name and symptoms again.";
-    }
-    chatHistory.push({ role: "assistant", content: pending.textContent });
-    speakText(pending.textContent);
-  } catch (error) {
-    await sendChatFallback(message, pending);
+    if (!bubble.textContent.trim()) throw new Error("empty stream");
   } finally {
     clearTimeout(timeout);
-    chatBtn.disabled = false;
-    chatBtn.textContent = "Send";
   }
 }
 
-async function sendChatFallback(message, pending) {
+async function fallbackChat(message, bubble) {
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        chemical: chemicalInput.value,
+        chemical: el.chemicalInput?.value || "",
         symptoms: "",
-        history: chatHistory.slice(-8),
+        history: state.chatHistory.slice(-8),
         language: currentLanguage(),
       }),
     });
     const data = await response.json();
-    pending.textContent = data.reply || "I could not create a reply. Please enter the chemical name and symptoms again.";
+    bubble.textContent = data.reply || "I could not create a reply. Please try again with the pesticide name and what happened.";
   } catch {
-    pending.textContent = "The AI model is unavailable. For urgent exposure: move to fresh air, remove contaminated clothes, wash exposed skin and hair with soap and water, rinse exposed eyes for 15 minutes, and call a hospital or 1800-116-117 if symptoms are present.";
+    bubble.textContent = "I could not reach the AI model. Tell me the pesticide name and symptoms, and for urgent symptoms call 112 or 1800-116-117.";
   }
-  chatHistory.push({ role: "assistant", content: pending.textContent });
-  speakText(pending.textContent);
+}
+
+function setupSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition || !el.micBtn) {
+    if (el.voiceStatus) el.voiceStatus.textContent = "Browser voice input is not supported here. Use Record voice or type.";
+    if (el.micBtn) el.micBtn.disabled = true;
+    return;
+  }
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 3;
+  recognition.onstart = () => {
+    el.micBtn.classList.add("listening");
+    el.micBtn.textContent = "Listening...";
+    lockVoiceStatus("Speak now.");
+  };
+  recognition.onresult = (event) => {
+    let transcript = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      transcript += event.results[index][0].transcript;
+    }
+    if (el.chatInput) {
+      el.chatInput.value = transcript;
+      el.chatInput.focus();
+    }
+    updateAutoLanguageFromText(transcript);
+    const isFinal = event.results[event.results.length - 1].isFinal;
+    lockVoiceStatus(isFinal ? `${(UI_TEXT[uiLanguage()] || UI_TEXT.en).voiceEdit} Heard: ${transcript}` : `Listening: ${transcript}`);
+    if (isFinal && state.voiceAutoSend) sendChat();
+  };
+  recognition.onerror = () => lockVoiceStatus("Voice input failed. Please try again or type.");
+  recognition.onend = () => {
+    el.micBtn.classList.remove("listening");
+    applyLanguage();
+  };
+}
+
+function startVoiceInput() {
+  if (!recognition) return;
+  recognition.lang = speechLang();
+  recognition.start();
+}
+
+async function toggleRecording() {
+  if (mediaRecorder?.state === "recording") {
+    mediaRecorder.stop();
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return lockVoiceStatus("Recording is not supported in this browser.");
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordedChunks.push(event.data);
+    };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      el.recordBtn.classList.remove("recording");
+      applyLanguage();
+      await transcribeRecording();
+    };
+    mediaRecorder.start();
+    el.recordBtn.textContent = "Stop recording";
+    el.recordBtn.classList.add("recording");
+    lockVoiceStatus("Recording... speak now.");
+  } catch {
+    lockVoiceStatus("Microphone permission denied or unavailable.");
+  }
+}
+
+async function transcribeRecording() {
+  const formData = new FormData();
+  formData.append("audio", new Blob(recordedChunks, { type: "audio/webm" }), "voice.webm");
+  formData.append("language", currentLanguage());
+  lockVoiceStatus("Converting voice to text...");
+  try {
+    const response = await fetch("/api/speech-to-text", { method: "POST", body: formData });
+    const data = await response.json();
+    if (!response.ok || !data.text) throw new Error(data.error || "No speech detected.");
+    el.chatInput.value = data.text;
+    updateAutoLanguageFromText(data.text);
+    lockVoiceStatus(`${(UI_TEXT[uiLanguage()] || UI_TEXT.en).voiceEdit} Heard: ${data.text}`);
+  } catch (error) {
+    lockVoiceStatus(error.message || "Server voice recognition is unavailable. Try browser Voice input or type.");
+  }
+}
+
+function toggleVoiceReply() {
+  state.voiceEnabled = !state.voiceEnabled;
+  localStorage.setItem("agriaiVoiceEnabled", String(state.voiceEnabled));
+  if (!state.voiceEnabled) stopSpeaking();
+  applyLanguage();
+}
+
+function speakText(text) {
+  if (!state.voiceEnabled || !text) return;
+  if (!("speechSynthesis" in window)) return speakWithServerTTS(text);
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = speechLang(text);
+  const voice = chooseVoice(utterance.lang);
+  if (voice) utterance.voice = voice;
+  utterance.rate = 0.95;
+  utterance.onerror = () => speakWithServerTTS(text);
+  window.speechSynthesis.speak(utterance);
+  lockVoiceStatus(`Speaking in ${utterance.lang}.`);
+}
+
+async function speakWithServerTTS(text) {
+  if (!state.voiceEnabled) return;
+  try {
+    const response = await fetch("/api/text-to-speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, language: uiLanguage() }),
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data.audio_base64) return;
+    if (fallbackAudio) fallbackAudio.pause();
+    fallbackAudio = new Audio(`data:${data.mime_type};base64,${data.audio_base64}`);
+    fallbackAudio.play();
+    lockVoiceStatus(`Speaking in ${data.language}.`);
+  } catch {
+    lockVoiceStatus("Voice output is unavailable in this browser.");
+  }
+}
+
+function stopSpeaking() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (fallbackAudio) {
+    fallbackAudio.pause();
+    fallbackAudio.currentTime = 0;
+  }
+}
+
+function speechLang(text = "") {
+  const selected = currentLanguage();
+  if (selected === "kn" || containsKannada(text)) return "kn-IN";
+  if (selected === "hi" || containsDevanagari(text)) return "hi-IN";
+  return "en-IN";
+}
+
+function chooseVoice(lang) {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find((voice) => voice.lang === lang)
+    || voices.find((voice) => voice.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()))
+    || voices[0];
 }
 
 function previewImage() {
-  const file = imageInput.files[0];
-  if (!file) {
-    imagePreview.removeAttribute("src");
-    return;
-  }
-  imagePreview.src = URL.createObjectURL(file);
+  const file = el.imageInput?.files?.[0];
+  if (!file || !el.imagePreview) return;
+  el.imagePreview.src = URL.createObjectURL(file);
 }
 
 async function analyzeImage() {
-  const file = imageInput.files[0];
-  if (!file) {
-    imageResult.textContent = "Choose or capture a pesticide label photo first.";
-    return;
-  }
-
-  imageAnalyzeBtn.disabled = true;
-  imageAnalyzeBtn.textContent = "Analyzing";
-  imageResult.textContent = "Analyzing photo with local/offline tools...";
+  const file = el.imageInput?.files?.[0];
+  const text = UI_TEXT[uiLanguage()] || UI_TEXT.en;
+  if (!file) return setResult(el.imageResult, text.noImage, true);
+  el.imageAnalyzeBtn.disabled = true;
+  el.imageAnalyzeBtn.textContent = text.analyzing;
+  setResult(el.imageResult, text.analyzing);
 
   const formData = new FormData();
   formData.append("image", file);
-  formData.append("notes", imageNotes.value);
-  formData.append("chemical_hint", chemicalInput.value);
+  formData.append("notes", el.imageNotes?.value || "");
+  formData.append("chemical_hint", el.chemicalInput?.value || "");
   formData.append("language", currentLanguage());
 
   try {
-    const response = await fetch("/api/analyze-image", {
-      method: "POST",
-      body: formData,
-    });
+    const response = await fetch("/api/analyze-image", { method: "POST", body: formData });
     const data = await response.json();
-    imageResult.innerHTML = renderImageAnalysis(data);
-    speakText(data.reply);
+    if (!response.ok) throw new Error(data.reply || data.error || "Image analysis failed.");
+    el.imageResult.className = "result-box";
+    el.imageResult.innerHTML = renderImageAnalysis(data);
+    if (!data.ocr_text && !data.analyzed_text?.trim()) {
+      el.imageResult.insertAdjacentHTML("beforeend", `<div class="result-box warning-box">${escapeHtml(text.imageHelp)}</div>`);
+    }
+    speakText(data.reply || "");
   } catch (error) {
-    imageResult.textContent = "Could not analyze the image. Type the pesticide name from the label and try chemical lookup.";
+    setResult(el.imageResult, error.message, true);
   } finally {
-    imageAnalyzeBtn.disabled = false;
-    imageAnalyzeBtn.textContent = "Analyze photo";
+    el.imageAnalyzeBtn.disabled = false;
+    el.imageAnalyzeBtn.textContent = "Analyze photo";
+    applyLanguage();
   }
 }
 
 function renderImageAnalysis(data) {
+  const text = UI_TEXT[uiLanguage()] || UI_TEXT.en;
   const details = data.details || {};
   const toxicity = data.toxicity_level || details.harmfulness_level || "Unknown";
-  const badgeClass = toxicity === "Extreme" || toxicity === "High" ? "danger" : toxicity === "Moderate" ? "warning" : "safe";
   const items = [
     ["Pesticide/Product", details.pesticide_name],
     ["Active ingredients", (details.active_ingredients || []).join(", ")],
@@ -795,65 +701,52 @@ function renderImageAnalysis(data) {
     ["Decontamination", (details.decontamination_steps || []).join("; ")],
     ["Environmental impact", details.environmental_impact],
   ];
-
   return `
     <div class="analysis-header">
-      <strong>Image Analysis</strong>
-      <span class="toxicity-badge ${badgeClass}">${toxicity}</span>
+      <strong>${escapeHtml(text.imageAnalysis)}</strong>
+      <span class="toxicity-badge ${dangerClass(toxicity)}">${escapeHtml(toxicity)}</span>
     </div>
     <pre>${escapeHtml(data.reply || "")}</pre>
     <div class="analysis-list">
-      ${items.map(([label, value]) => `<div><b>${label}:</b> ${value || "Unknown"}</div>`).join("")}
+      ${items.map(([label, value]) => `<div><b>${escapeHtml(label)}:</b> ${escapeHtml(value || "Unknown")}</div>`).join("")}
     </div>
     <details>
       <summary>OCR details</summary>
-      <div><b>Engines:</b> ${(data.ocr_engines || []).join(", ") || "None available"}</div>
-      <pre>${escapeHtml(data.ocr_text || "No text extracted")}</pre>
+      <div><b>Engines:</b> ${escapeHtml((data.ocr_engines || []).join(", ") || "None available")}</div>
+      <pre>${escapeHtml(data.analyzed_text || data.ocr_text || "No text extracted")}</pre>
+      ${(data.ocr_errors || []).length ? `<pre>${escapeHtml(data.ocr_errors.join("\n"))}</pre>` : ""}
     </details>
   `;
 }
 
+function lockVoiceStatus(message) {
+  if (!el.voiceStatus) return;
+  el.voiceStatus.dataset.locked = "1";
+  el.voiceStatus.textContent = message;
+  setTimeout(() => {
+    if (el.voiceStatus) delete el.voiceStatus.dataset.locked;
+  }, 3500);
+}
+
+function setResult(node, message, isError = false) {
+  if (!node) return;
+  node.className = `result-box ${isError ? "error" : "muted"}`;
+  node.textContent = message;
+}
+
+function containsKannada(text) {
+  return /[\u0c80-\u0cff]/.test(text || "");
+}
+
+function containsDevanagari(text) {
+  return /[\u0900-\u097f]/.test(text || "");
+}
+
 function escapeHtml(value) {
-  return String(value)
+  return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-
-lookupBtn.addEventListener("click", lookupChemical);
-chemicalInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") lookupChemical();
-});
-
-document.querySelectorAll(".segment").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".segment").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    loadChecklist(button.dataset.exposure);
-  });
-});
-
-symptomBtn.addEventListener("click", analyzeSymptoms);
-locationBtn.addEventListener("click", useLocation);
-alertBtn.addEventListener("click", createAlert);
-chatBtn.addEventListener("click", sendChat);
-micBtn.addEventListener("click", () => {
-  if (!recognition) return;
-  recognition.lang = browserSpeechLanguage();
-  recognition.start();
-});
-recordBtn.addEventListener("click", toggleRecording);
-voiceToggleBtn.addEventListener("click", toggleVoiceReply);
-imageInput.addEventListener("change", previewImage);
-imageAnalyzeBtn.addEventListener("click", analyzeImage);
-languageSelect.addEventListener("change", applyUILanguage);
-chatInput.addEventListener("input", () => updateAutoLanguageFromText(chatInput.value));
-chatInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") sendChat();
-});
-
-setupSpeechRecognition();
-applyUILanguage();
-loadChecklist();

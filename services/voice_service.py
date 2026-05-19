@@ -18,7 +18,7 @@ def speech_to_text(audio_bytes: bytes, language: str = "auto") -> str | None:
             _WHISPER = pipeline(
                 "automatic-speech-recognition",
                 model=os.getenv("HF_WHISPER_MODEL", "openai/whisper-tiny"),
-                local_files_only=os.getenv("HF_LOCAL_ONLY", "1") == "1",
+                local_files_only=os.getenv("HF_LOCAL_ONLY", "0") == "1",
             )
         language_map = {"en": "english", "hi": "hindi", "kn": "kannada"}
         generate_kwargs = {} if language == "auto" else {"language": language_map.get(language, language)}

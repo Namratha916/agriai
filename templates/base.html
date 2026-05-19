@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AgriAI Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=2">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Chemical decontamination alert system</p>
+        <h1>AgriAI</h1>
+      </div>
+      <div class="top-actions">
+        <label class="language-control">
+          Language
+          <select id="languageSelect">
+            <option value="auto">Auto</option>
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="kn">Kannada</option>
+          </select>
+        </label>
+        <a class="helpline" href="tel:1800116117">India poison helpline: 1800-116-117</a>
+      </div>
+    </header>
+
+    
+    <nav class="app-nav">
+      <a class="nav-tab" href="/">Dashboard</a>
+      <a class="nav-tab" href="/chatbot">Chatbot</a>
+      <a class="nav-tab" href="/identifier">Identifier</a>
+      <a class="nav-tab" href="/analyzer">Analyzer</a>
+      <a class="nav-tab" href="/checklist">Checklist</a>
+      <a class="nav-tab" href="/symptoms">Symptoms</a>
+      <a class="nav-tab" href="/emergency">Emergency</a>
+      <a class="nav-tab" href="/hospital">Hospital</a>
+    </nav>
+
+
+    <main class="app-shell">
+{% block content %}{% endblock %}
+</main>
+
+    <script src="{{ url_for('static', filename='app.js') }}?v=2"></script>
+  </body>
+</html>

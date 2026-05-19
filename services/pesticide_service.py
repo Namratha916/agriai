@@ -117,18 +117,20 @@ class PesticideKnowledgeBase:
         if pesticide is None and active_ingredients:
             pesticide = self.find(" ".join(active_ingredients))
 
+        product_guess = active_ingredients[0] if active_ingredients else guess_product_name(combined)
         return {
             "pesticide": pesticide,
             "active_ingredients": active_ingredients,
+            "product_guess": product_guess,
             "toxicity_level": toxicity_level(pesticide, combined),
             "toxicity_category": toxicity_category(pesticide, combined),
             "matched_text": combined[:4000],
         }
 
-    def structured_details(self, pesticide: dict[str, Any] | None, active_ingredients: list[str]) -> dict[str, Any]:
+    def structured_details(self, pesticide: dict[str, Any] | None, active_ingredients: list[str], product_guess: str = "") -> dict[str, Any]:
         if pesticide is None:
             return {
-                "pesticide_name": "Not detected from image",
+                "pesticide_name": active_ingredients[0] if active_ingredients else (product_guess or "Not detected from image"),
                 "active_ingredients": active_ingredients,
                 "usage": "Not detected. Type the product name or active ingredient visible on the label.",
                 "harmfulness_level": "Needs label text",
@@ -180,6 +182,16 @@ def extract_active_ingredients(text: str) -> list[str]:
             if cleaned and cleaned not in found:
                 found.append(cleaned[:120])
     return found[:5]
+
+
+def guess_product_name(text: str) -> str:
+    skip = {"danger", "warning", "caution", "poison", "pesticide", "insecticide", "fungicide", "herbicide"}
+    for line in (text or "").splitlines():
+        clean = re.sub(r"[^A-Za-z0-9 %.\-]", " ", line).strip()
+        words = [word for word in clean.split() if len(word) >= 4 and normalize(word) not in skip]
+        if words:
+            return " ".join(words[:4])[:80]
+    return ""
 
 
 def toxicity_level(pesticide: dict[str, Any] | None, text: str) -> str:

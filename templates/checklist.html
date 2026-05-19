@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page active">
+  <article class="panel">
+    <div class="section-title">
+      <span>W</span>
+      <div>
+        <h2>Decontamination Checklist</h2>
+        <p>Choose exposure type and follow each step before entering the home.</p>
+      </div>
+    </div>
+    <div class="segmented">
+      <button class="segment active" type="button" data-exposure="skin">Skin/clothes</button>
+      <button class="segment" type="button" data-exposure="eye">Eyes</button>
+      <button class="segment" type="button" data-exposure="inhalation">Breathing</button>
+    </div>
+    <ol id="checklist" class="checklist"></ol>
+  </article>
+</section>
+{% endblock %}

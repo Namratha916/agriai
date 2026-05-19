@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page active">
+  <article class="panel">
+    <div class="section-title">
+      <span>ID</span>
+      <div>
+        <h2>Chemical Identifier</h2>
+        <p>Enter the pesticide or chemical name from the bottle, bag, or label.</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <input id="chemicalInput" list="chemicalList" placeholder="Example: chlorpyrifos, paraquat, glyphosate">
+      <button id="lookupBtn" type="button">Check</button>
+    </div>
+    <datalist id="chemicalList">
+      {% for pesticide in pesticides %}
+      <option value="{{ pesticide.name }}"></option>
+      {% endfor %}
+    </datalist>
+    <div id="chemicalResult" class="result-box muted">Chemical risk details will appear here.</div>
+  </article>
+</section>
+{% endblock %}
