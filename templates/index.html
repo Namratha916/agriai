@@ -163,8 +163,9 @@
         <div class="voice-controls">
           <button id="micBtn" type="button">Voice input</button>
           <button id="recordBtn" type="button">Record voice</button>
-          <label class="toggle-row"><input id="speakToggle" type="checkbox" checked> Speak replies</label>
+          <button id="voiceToggleBtn" type="button" class="voice-toggle" aria-pressed="true">🔊 Voice ON</button>
           <span id="voiceStatus" class="muted">Voice uses your browser speech tools.</span>
+          <span id="selectedLanguageStatus" class="language-status">English</span>
         </div>
         <div class="chat-form">
           <input id="chatInput" placeholder="Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?">

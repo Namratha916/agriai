@@ -410,6 +410,44 @@ pre {
   margin-top: 12px;
 }
 
+.voice-toggle {
+  background: var(--blue);
+}
+
+.voice-toggle.off {
+  background: #6b7280;
+}
+
+.language-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fbfcfb;
+  color: var(--green-dark);
+  font-weight: 800;
+}
+
+#micBtn.listening,
+#recordBtn.recording {
+  animation: pulseMic 1s infinite;
+  background: var(--red);
+}
+
+@keyframes pulseMic {
+  0% {
+    box-shadow: 0 0 0 0 rgba(181, 37, 37, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(181, 37, 37, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(181, 37, 37, 0);
+  }
+}
+
 .toggle-row {
   display: inline-flex;
   gap: 8px;

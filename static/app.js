@@ -18,8 +18,9 @@ const chatBtn = document.querySelector("#chatBtn");
 const languageSelect = document.querySelector("#languageSelect");
 const micBtn = document.querySelector("#micBtn");
 const recordBtn = document.querySelector("#recordBtn");
-const speakToggle = document.querySelector("#speakToggle");
+const voiceToggleBtn = document.querySelector("#voiceToggleBtn");
 const voiceStatus = document.querySelector("#voiceStatus");
+const selectedLanguageStatus = document.querySelector("#selectedLanguageStatus");
 const imageInput = document.querySelector("#imageInput");
 const imagePreview = document.querySelector("#imagePreview");
 const imageNotes = document.querySelector("#imageNotes");
@@ -32,6 +33,8 @@ let recognition = null;
 let mediaRecorder = null;
 let recordedChunks = [];
 let detectedAutoLanguage = "en";
+let voiceEnabled = localStorage.getItem("agriaiVoiceEnabled") !== "false";
+let fallbackAudio = null;
 
 const UI_TEXT = {
   en: {
@@ -73,8 +76,10 @@ const UI_TEXT = {
     chatWelcome: "Tell me the chemical name, how exposure happened, and symptoms. I will guide the next step.",
     voiceInput: "Voice input",
     recordVoice: "Record voice",
-    speakReplies: "Speak replies",
+    voiceOn: "🔊 Voice ON",
+    voiceOff: "🔇 Voice OFF",
     voiceStatus: "Voice uses your browser speech tools.",
+    selectedLanguage: "English",
     chatPlaceholder: "Ask: I sprayed chlorpyrifos and feel dizzy, what should I do?",
     send: "Send",
     symptomLabels: ["Headache", "Vomiting", "Dizziness", "Eye irritation", "Breathing difficulty", "Heavy sweating", "Muscle twitching", "Confusion"],
@@ -118,8 +123,10 @@ const UI_TEXT = {
     chatWelcome: "Chemical name, exposure कैसे हुआ, और symptoms बताइए. मैं next step बताऊंगा.",
     voiceInput: "Voice input",
     recordVoice: "Voice record",
-    speakReplies: "Replies बोलें",
+    voiceOn: "🔊 आवाज ON",
+    voiceOff: "🔇 आवाज OFF",
     voiceStatus: "Voice आपके browser speech tools का उपयोग करता है.",
+    selectedLanguage: "हिंदी",
     chatPlaceholder: "पूछें: मैंने chlorpyrifos spray किया और चक्कर आ रहा है, क्या करूं?",
     send: "भेजें",
     symptomLabels: ["सिरदर्द", "उल्टी", "चक्कर", "आंख में जलन", "सांस की दिक्कत", "ज्यादा पसीना", "मांसपेशी फड़कना", "भ्रम"],
@@ -163,8 +170,10 @@ const UI_TEXT = {
     chatWelcome: "Chemical name, exposure ಹೇಗೆ ಆಯಿತು, ಮತ್ತು symptoms ಹೇಳಿ. ನಾನು next step ಹೇಳುತ್ತೇನೆ.",
     voiceInput: "Voice input",
     recordVoice: "Voice record",
-    speakReplies: "Replies ಮಾತಾಡಲಿ",
+    voiceOn: "🔊 ಧ್ವನಿ ON",
+    voiceOff: "🔇 ಧ್ವನಿ OFF",
     voiceStatus: "Voice ನಿಮ್ಮ browser speech tools ಬಳಸುತ್ತದೆ.",
+    selectedLanguage: "ಕನ್ನಡ",
     chatPlaceholder: "ಕೇಳಿ: ನಾನು chlorpyrifos spray ಮಾಡಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ, ಏನು ಮಾಡಲಿ?",
     send: "ಕಳುಹಿಸಿ",
     symptomLabels: ["ತಲೆನೋವು", "ವಾಂತಿ", "ತಲೆ ಸುತ್ತುವುದು", "ಕಣ್ಣು ಉರಿಯುವುದು", "ಉಸಿರಾಟದ ತೊಂದರೆ", "ಹೆಚ್ಚು ಬೆವರು", "ಮಾಂಸಖಂಡ twitching", "ಗೊಂದಲ"],
@@ -212,8 +221,11 @@ function applyUILanguage() {
   document.querySelector(".hospital-actions a[href='tel:1800116117']").textContent = text.callPoison;
   micBtn.textContent = text.voiceInput;
   recordBtn.textContent = text.recordVoice;
-  document.querySelector(".toggle-row").lastChild.textContent = ` ${text.speakReplies}`;
+  voiceToggleBtn.textContent = voiceEnabled ? text.voiceOn : text.voiceOff;
+  voiceToggleBtn.setAttribute("aria-pressed", String(voiceEnabled));
+  voiceToggleBtn.classList.toggle("off", !voiceEnabled);
   voiceStatus.textContent = text.voiceStatus;
+  selectedLanguageStatus.textContent = text.selectedLanguage;
   chatInput.placeholder = text.chatPlaceholder;
   chatBtn.textContent = text.send;
   const headings = document.querySelectorAll("h2");
@@ -406,14 +418,65 @@ function containsDevanagari(text) {
 }
 
 function speakText(text) {
-  if (!speakToggle.checked || !("speechSynthesis" in window)) return;
+  if (!voiceEnabled) {
+    stopSpeaking();
+    return;
+  }
+  if (!("speechSynthesis" in window)) {
+    speakWithServerTTS(text);
+    return;
+  }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   const language = currentLanguage();
   utterance.lang = language === "kn" || containsKannada(text) ? "kn-IN" : language === "hi" || containsDevanagari(text) ? "hi-IN" : "en-IN";
+  const voice = chooseVoice(utterance.lang);
+  if (voice) utterance.voice = voice;
   utterance.rate = 0.95;
+  utterance.onerror = () => speakWithServerTTS(text);
   window.speechSynthesis.speak(utterance);
   voiceStatus.textContent = `Speaking in ${utterance.lang}.`;
+}
+
+function chooseVoice(lang) {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find((voice) => voice.lang === lang) || voices.find((voice) => voice.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+}
+
+async function speakWithServerTTS(text) {
+  if (!voiceEnabled) return;
+  try {
+    const response = await fetch("/api/text-to-speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, language: uiLanguage() }),
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data.audio_base64) return;
+    if (fallbackAudio) fallbackAudio.pause();
+    fallbackAudio = new Audio(`data:${data.mime_type};base64,${data.audio_base64}`);
+    fallbackAudio.play();
+    voiceStatus.textContent = `Speaking in ${data.language}.`;
+  } catch {
+    voiceStatus.textContent = "Voice output is unavailable in this browser.";
+  }
+}
+
+function stopSpeaking() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (fallbackAudio) {
+    fallbackAudio.pause();
+    fallbackAudio.currentTime = 0;
+  }
+}
+
+function toggleVoiceReply() {
+  voiceEnabled = !voiceEnabled;
+  localStorage.setItem("agriaiVoiceEnabled", String(voiceEnabled));
+  if (!voiceEnabled) stopSpeaking();
+  applyUILanguage();
+  voiceStatus.textContent = voiceEnabled ? "Voice reply enabled." : "Voice reply stopped.";
 }
 
 function setupSpeechRecognition() {
@@ -426,18 +489,23 @@ function setupSpeechRecognition() {
 
   recognition = new SpeechRecognition();
   recognition.continuous = false;
-  recognition.interimResults = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 3;
 
   recognition.onstart = () => {
     micBtn.textContent = "Listening...";
+    micBtn.classList.add("listening");
     voiceStatus.textContent = "Speak now.";
   };
 
   recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
+    let transcript = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      transcript += event.results[index][0].transcript;
+    }
     chatInput.value = transcript;
     updateAutoLanguageFromText(transcript);
-    voiceStatus.textContent = `Heard: ${transcript}`;
+    voiceStatus.textContent = event.results[event.results.length - 1].isFinal ? `Heard: ${transcript}` : `Listening: ${transcript}`;
     chatInput.focus();
   };
 
@@ -447,6 +515,8 @@ function setupSpeechRecognition() {
 
   recognition.onend = () => {
     micBtn.textContent = "Voice input";
+    micBtn.classList.remove("listening");
+    applyUILanguage();
   };
 }
 
@@ -471,10 +541,12 @@ async function toggleRecording() {
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach((track) => track.stop());
       recordBtn.textContent = "Record voice";
+      recordBtn.classList.remove("recording");
       await transcribeRecording();
     };
     mediaRecorder.start();
     recordBtn.textContent = "Stop recording";
+    recordBtn.classList.add("recording");
     voiceStatus.textContent = "Recording... speak now.";
   } catch {
     voiceStatus.textContent = "Microphone permission denied or unavailable.";
@@ -653,6 +725,7 @@ function renderImageAnalysis(data) {
       <strong>Image Analysis</strong>
       <span class="toxicity-badge ${badgeClass}">${toxicity}</span>
     </div>
+    <pre>${escapeHtml(data.reply || "")}</pre>
     <div class="analysis-list">
       ${items.map(([label, value]) => `<div><b>${label}:</b> ${value || "Unknown"}</div>`).join("")}
     </div>
@@ -696,6 +769,7 @@ micBtn.addEventListener("click", () => {
   recognition.start();
 });
 recordBtn.addEventListener("click", toggleRecording);
+voiceToggleBtn.addEventListener("click", toggleVoiceReply);
 imageInput.addEventListener("change", previewImage);
 imageAnalyzeBtn.addEventListener("click", analyzeImage);
 languageSelect.addEventListener("change", applyUILanguage);

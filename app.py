@@ -15,7 +15,7 @@ from services.ocr_service import OCRService
 from services.ollama_service import OllamaClient
 from services.pesticide_service import PesticideKnowledgeBase
 from services.rag_service import RAGService
-from services.voice_service import speech_to_text, text_to_speech_base64
+from services.voice_service import speech_to_text, text_to_speech_audio
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -34,7 +34,7 @@ KB = PesticideKnowledgeBase(DATA_PATH)
 OCR = OCRService(
     trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
     local_only=HF_LOCAL_ONLY,
-    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "0") == "1",
+    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "1") == "1",
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
@@ -636,7 +636,7 @@ def api_analyze_image():
     rag_context = RAG.context(f"{details['pesticide_name']} {ocr_result.text} {notes}", top_k=4)
     pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
 
-    fallback_reply = format_image_report(details, ocr_result, extracted)
+    fallback_reply = format_image_report(details, ocr_result, extracted, language)
     ai_reply = None
     if AI_IMAGE_EXPLANATION:
         prompt = IMAGE_ANALYSIS_PROMPT.format(
@@ -667,7 +667,33 @@ def api_analyze_image():
     )
 
 
-def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any]) -> str:
+def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en") -> str:
+    if language == "kn":
+        return (
+            f"1. ಪೆಸ್ಟಿಸೈಡ್ ಹೆಸರು: {details['pesticide_name']}\n"
+            f"2. Active ingredients: {', '.join(details['active_ingredients']) or 'label text ಬೇಕು'}\n"
+            f"3. Toxicity level: {extracted['toxicity_level']}\n"
+            f"4. Danger category: {extracted['toxicity_category']}\n"
+            f"5. Side effects: {', '.join(details['side_effects']) or 'ಪೆಸ್ಟಿಸೈಡ್ ಹೆಸರು ಸ್ಪಷ್ಟವಾದ ನಂತರ ಮಾತ್ರ ಖಚಿತವಾಗಿ ಹೇಳಬಹುದು'}\n"
+            f"6. First aid: {details['first_aid']}\n"
+            f"7. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
+            f"8. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
+            "9. Emergency warning: ಉಸಿರಾಟದ ತೊಂದರೆ, ವಾಂತಿ, ತಲೆ ಸುತ್ತುವುದು, fits, confusion ಅಥವಾ pesticide ನುಂಗಿದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. Product label ತೆಗೆದುಕೊಂಡು ಹೋಗಿ.\n"
+            f"OCR engines: {', '.join(ocr_result.engines_used) or 'OCR engine ಲಭ್ಯವಿಲ್ಲ'}"
+        )
+    if language == "hi":
+        return (
+            f"1. Pesticide नाम: {details['pesticide_name']}\n"
+            f"2. Active ingredients: {', '.join(details['active_ingredients']) or 'label text चाहिए'}\n"
+            f"3. Toxicity level: {extracted['toxicity_level']}\n"
+            f"4. Danger category: {extracted['toxicity_category']}\n"
+            f"5. Side effects: {', '.join(details['side_effects']) or 'pesticide name साफ होने के बाद ही बताया जा सकता है'}\n"
+            f"6. First aid: {details['first_aid']}\n"
+            f"7. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
+            f"8. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
+            "9. Emergency warning: सांस की दिक्कत, उल्टी, चक्कर, fits, confusion या pesticide निगलने पर तुरंत hospital जाएं. Product label साथ ले जाएं.\n"
+            f"OCR engines: {', '.join(ocr_result.engines_used) or 'OCR engine unavailable'}"
+        )
     return (
         f"Pesticide/Product Name: {details['pesticide_name']}\n"
         f"Active Ingredients: {', '.join(details['active_ingredients']) or 'Unknown'}\n"
@@ -779,7 +805,7 @@ def api_speech_to_text():
     if not text:
         return jsonify({"error": "Speech recognition model is unavailable. Use browser voice input or install/cache Whisper."}), 503
     detected_language = resolve_language(language, text)
-    return jsonify({"text": text, "language": detected_language, "model": "openai/whisper-small"})
+    return jsonify({"text": text, "language": detected_language, "model": os.getenv("HF_WHISPER_MODEL", "openai/whisper-tiny")})
 
 
 @app.post("/api/text-to-speech")
@@ -790,10 +816,10 @@ def api_text_to_speech():
     if not text:
         return jsonify({"error": "Text is required."}), 400
 
-    audio_base64 = text_to_speech_base64(text, language)
-    if not audio_base64:
+    audio = text_to_speech_audio(text, language)
+    if not audio:
         return jsonify({"error": "Server TTS is unavailable. Browser speech synthesis can still speak replies."}), 503
-    return jsonify({"audio_base64": audio_base64, "mime_type": "audio/mpeg", "language": language})
+    return jsonify({"audio_base64": audio["audio_base64"], "mime_type": audio["mime_type"], "language": language})
 
 
 @app.post("/api/chat-stream")

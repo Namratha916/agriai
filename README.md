@@ -12,13 +12,13 @@ AgriAI is an AI-powered pesticide safety and farmer assistance platform for farm
 - Nearby hospital and poison-control map links.
 - Offline-first Ollama chatbot endpoint for contextual GenAI replies.
 - Prompt-template based chat behavior in `prompt_templates.py`.
-- English/Kannada language switching with auto language detection.
+- English/Hindi/Kannada language switching with auto language detection.
 - Browser voice input and voice output using Web Speech APIs.
 - Pesticide label photo upload with optional local Hugging Face image-to-text analysis.
 - Multi-engine OCR pipeline: image preprocessing, Tesseract OCR, EasyOCR, and Hugging Face TrOCR fallback.
 - Pesticide detail extraction: product name, active ingredients, usage, toxicity level, side effects, first aid, decontamination, and environmental impact.
 - RAG retrieval over `data/pesticides.json` and text manuals in `knowledge/`, with optional ChromaDB + sentence-transformers.
-- Optional Whisper speech-to-text and gTTS server-side text-to-speech APIs.
+- Optional Whisper speech-to-text and gTTS/Coqui server-side text-to-speech APIs.
 - Optional Streamlit companion UI in `streamlit_app.py`.
 
 ## Run
@@ -70,6 +70,11 @@ Use the language selector in the header:
 
 Voice input and voice output use the browser Web Speech APIs, so they work best in browsers that support `SpeechRecognition` and `speechSynthesis`. Kannada voice support depends on the voices installed in the browser/operating system.
 
+The dedicated speaker button controls voice replies globally:
+
+- `Voice ON`: AgriAI speaks chatbot and image-analysis replies.
+- `Voice OFF`: AgriAI immediately calls `window.speechSynthesis.cancel()` and stops any server audio playback.
+
 ## OCR And Hugging Face Photo Analysis
 
 The pesticide photo analyzer is offline-first. Pipeline:
@@ -87,11 +92,13 @@ Image upload
 
 ```powershell
 $env:HF_OCR_MODEL="microsoft/trocr-base-printed"
+$env:HF_WHISPER_MODEL="openai/whisper-tiny"
 $env:HF_LOCAL_ONLY="1"
+$env:AGRIAI_DEEP_OCR="1"
 python app.py
 ```
 
-Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. Python packages are listed in `requirements.txt`.
+Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. The OCR service applies grayscale conversion, contrast enhancement, sharpening, OpenCV resizing, adaptive thresholding, Otsu thresholding, Tesseract OCR, and optional EasyOCR/TrOCR fallback.
 
 Because `HF_LOCAL_ONLY=1`, Hugging Face models must already be cached locally. Set `HF_LOCAL_ONLY=0` only if you want Transformers to download models.
 
@@ -103,8 +110,8 @@ AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or s
 
 Frontend voice input uses browser Web Speech API. Backend voice endpoints are also available:
 
-- `POST /api/speech-to-text`: accepts an uploaded audio file named `audio`, uses `openai/whisper-small` if available.
-- `POST /api/text-to-speech`: accepts JSON `{ "text": "...", "language": "en|hi|kn" }`, uses gTTS if available.
+- `POST /api/speech-to-text`: accepts an uploaded audio file named `audio`, uses `openai/whisper-tiny` by default for lower latency.
+- `POST /api/text-to-speech`: accepts JSON `{ "text": "...", "language": "en|hi|kn" }`, uses gTTS first and optional Coqui TTS fallback if installed.
 
 Browser speech synthesis is still used as a low-memory fallback.
 
