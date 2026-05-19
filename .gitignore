@@ -1,7 +1,9 @@
 .venv/
+.venv312/
 __pycache__/
 *.py[cod]
 .env
+data/users.json
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

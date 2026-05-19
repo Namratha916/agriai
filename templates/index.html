@@ -114,19 +114,18 @@
           <div class="section-title">
             <span>4</span>
             <div>
-              <h2>Emergency Alert</h2>
-              <p>Create a one-tap message with chemical, symptoms, and location.</p>
+              <h2>Emergency Help</h2>
+              <p>Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.</p>
             </div>
           </div>
-          <input id="contactInput" placeholder="Emergency contact phone number">
           <div class="button-row">
             <button id="locationBtn" type="button">Use location</button>
-            <button id="alertBtn" type="button">Create alert</button>
+            <button id="alertBtn" type="button">Create message</button>
           </div>
           <textarea id="emergencyMessage" rows="5" readonly placeholder="Emergency message will be generated here."></textarea>
           <div class="button-row">
-            <a id="smsLink" class="button-link disabled" href="#">SMS</a>
-            <a id="whatsappLink" class="button-link disabled" href="#">WhatsApp</a>
+            <a class="button-link danger-link" href="tel:112">Call 112</a>
+            <a class="button-link secondary" href="tel:1800116117">Call poison helpline</a>
           </div>
         </article>
 

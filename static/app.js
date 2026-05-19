@@ -8,9 +8,6 @@ const symptomText = document.querySelector("#symptomText");
 const locationBtn = document.querySelector("#locationBtn");
 const alertBtn = document.querySelector("#alertBtn");
 const emergencyMessage = document.querySelector("#emergencyMessage");
-const contactInput = document.querySelector("#contactInput");
-const smsLink = document.querySelector("#smsLink");
-const whatsappLink = document.querySelector("#whatsappLink");
 const hospitalLink = document.querySelector("#hospitalLink");
 const chatLog = document.querySelector("#chatLog");
 const chatInput = document.querySelector("#chatInput");
@@ -60,11 +57,10 @@ const UI_TEXT = {
     symptomsDesc: "Select symptoms or type your own observations.",
     symptomText: "Other symptoms or what happened...",
     analyzeSymptoms: "Analyze symptoms",
-    emergencyTitle: "Emergency Alert",
-    emergencyDesc: "Create a one-tap message with chemical, symptoms, and location.",
-    contact: "Emergency contact phone number",
+    emergencyTitle: "Emergency Help",
+    emergencyDesc: "Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.",
     location: "Use location",
-    createAlert: "Create alert",
+    createAlert: "Create message",
     emergencyMessage: "Emergency message will be generated here.",
     hospitalTitle: "Nearby Hospital Finder",
     hospitalDesc: "Open a map search for hospitals or poison support near your position.",
@@ -180,6 +176,102 @@ const UI_TEXT = {
   },
 };
 
+UI_TEXT.hi = {
+  ...UI_TEXT.en,
+  eyebrow: "रासायनिक सुरक्षा सहायक",
+  language: "भाषा",
+  helpline: "विष हेल्पलाइन: 1800-116-117",
+  chemicalTitle: "रसायन पहचान",
+  chemicalDesc: "बोतल, पैकेट या लेबल पर लिखा कीटनाशक/रसायन नाम डालें।",
+  chemicalPlaceholder: "उदाहरण: chlorpyrifos, paraquat, glyphosate",
+  check: "जांचें",
+  chemicalResult: "रसायन की जोखिम जानकारी यहां दिखेगी।",
+  imageTitle: "कीटनाशक फोटो विश्लेषक",
+  imageDesc: "लेबल की साफ फोटो अपलोड करें। OCR न पढ़े तो दिखने वाला टेक्स्ट लिखें।",
+  imageNotes: "लेबल पर दिखने वाला टेक्स्ट लिखें, जैसे chlorpyrifos 20% EC",
+  analyzePhoto: "फोटो विश्लेषण",
+  imageResult: "फोटो विश्लेषण यहां दिखेगा।",
+  checklistTitle: "डी-कंटैमिनेशन चेकलिस्ट",
+  checklistDesc: "संपर्क का प्रकार चुनें और घर जाने से पहले सभी कदम पूरे करें।",
+  skin: "त्वचा/कपड़े",
+  eyes: "आंखें",
+  breathing: "सांस",
+  symptomsTitle: "लक्षण जांच",
+  symptomsDesc: "लक्षण चुनें या अपनी बात लिखें।",
+  symptomText: "अन्य लक्षण या क्या हुआ...",
+  analyzeSymptoms: "लक्षण जांचें",
+  emergencyTitle: "आपात मदद",
+  emergencyDesc: "रसायन, लक्षण और स्थान के साथ आपात मार्गदर्शन बनाएं।",
+  location: "स्थान लें",
+  createAlert: "संदेश बनाएं",
+  emergencyMessage: "आपात संदेश यहां बनेगा।",
+  hospitalTitle: "नजदीकी अस्पताल",
+  hospitalDesc: "अपने स्थान के पास अस्पताल या विष सहायता खोजें।",
+  nearestHospital: "नजदीकी अस्पताल",
+  poisonCenter: "विष नियंत्रण केंद्र",
+  callPoison: "1800-116-117 कॉल करें",
+  chatTitle: "AgriAI सहायक",
+  chatDesc: "Ollama चल रहा हो तो स्थानीय AI मॉडल से जवाब मिलेगा।",
+  chatWelcome: "रसायन का नाम, संपर्क कैसे हुआ, और लक्षण बताइए।",
+  voiceInput: "आवाज इनपुट",
+  recordVoice: "आवाज रिकॉर्ड",
+  voiceOn: "Voice ON",
+  voiceOff: "Voice OFF",
+  voiceStatus: "आवाज इनपुट आपके ब्राउजर के speech tools से काम करता है।",
+  selectedLanguage: "हिन्दी",
+  chatPlaceholder: "पूछें: मैंने chlorpyrifos spray किया और चक्कर आ रहा है, क्या करूं?",
+  send: "भेजें",
+  symptomLabels: ["सिरदर्द", "उल्टी", "चक्कर", "आंख में जलन", "सांस की दिक्कत", "ज्यादा पसीना", "मांसपेशी फड़कना", "भ्रम"],
+};
+
+UI_TEXT.kn = {
+  ...UI_TEXT.en,
+  eyebrow: "ರಾಸಾಯನಿಕ ಸುರಕ್ಷತಾ ಸಹಾಯಕ",
+  language: "ಭಾಷೆ",
+  helpline: "ವಿಷ ಸಹಾಯವಾಣಿ: 1800-116-117",
+  chemicalTitle: "ರಾಸಾಯನಿಕ ಗುರುತು",
+  chemicalDesc: "ಬಾಟಲ್, ಪ್ಯಾಕೆಟ್ ಅಥವಾ ಲೇಬಲ್‌ನಲ್ಲಿರುವ ಕೀಟನಾಶಕ/ರಾಸಾಯನಿಕ ಹೆಸರನ್ನು ನಮೂದಿಸಿ.",
+  chemicalPlaceholder: "ಉದಾಹರಣೆ: chlorpyrifos, paraquat, glyphosate",
+  check: "ಪರಿಶೀಲಿಸಿ",
+  chemicalResult: "ರಾಸಾಯನಿಕದ ಅಪಾಯ ಮಾಹಿತಿ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+  imageTitle: "ಕೀಟನಾಶಕ ಫೋಟೋ ವಿಶ್ಲೇಷಕ",
+  imageDesc: "ಸ್ಪಷ್ಟ ಲೇಬಲ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ. OCR ಓದದಿದ್ದರೆ ಕಾಣುವ ಪಠ್ಯವನ್ನು ಬರೆಯಿರಿ.",
+  imageNotes: "ಲೇಬಲ್‌ನಲ್ಲಿ ಕಾಣುವ ಪಠ್ಯ ಬರೆಯಿರಿ, ಉದಾ: chlorpyrifos 20% EC",
+  analyzePhoto: "ಫೋಟೋ ವಿಶ್ಲೇಷಿಸಿ",
+  imageResult: "ಫೋಟೋ ವಿಶ್ಲೇಷಣೆ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+  checklistTitle: "ಡೀಕಂಟಾಮಿನೇಶನ್ ಚೆಕ್‌ಲಿಸ್ಟ್",
+  checklistDesc: "ಸಂಪರ್ಕದ ಪ್ರಕಾರ ಆಯ್ಕೆ ಮಾಡಿ ಮತ್ತು ಮನೆಗೆ ಹೋಗುವ ಮೊದಲು ಎಲ್ಲಾ ಹಂತಗಳನ್ನು ಅನುಸರಿಸಿ.",
+  skin: "ಚರ್ಮ/ಬಟ್ಟೆ",
+  eyes: "ಕಣ್ಣುಗಳು",
+  breathing: "ಉಸಿರಾಟ",
+  symptomsTitle: "ಲಕ್ಷಣ ಪರಿಶೀಲನೆ",
+  symptomsDesc: "ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಿ ಅಥವಾ ಏನಾಯಿತು ಎಂದು ಬರೆಯಿರಿ.",
+  symptomText: "ಇತರ ಲಕ್ಷಣಗಳು ಅಥವಾ ಏನಾಯಿತು...",
+  analyzeSymptoms: "ಲಕ್ಷಣ ಪರಿಶೀಲಿಸಿ",
+  emergencyTitle: "ತುರ್ತು ಸಹಾಯ",
+  emergencyDesc: "ರಾಸಾಯನಿಕ, ಲಕ್ಷಣಗಳು ಮತ್ತು ಸ್ಥಳದೊಂದಿಗೆ ತುರ್ತು ಮಾರ್ಗದರ್ಶನ ರಚಿಸಿ.",
+  location: "ಸ್ಥಳ ಬಳಸಿ",
+  createAlert: "ಸಂದೇಶ ರಚಿಸಿ",
+  emergencyMessage: "ತುರ್ತು ಸಂದೇಶ ಇಲ್ಲಿ ರಚಿಸಲಾಗುತ್ತದೆ.",
+  hospitalTitle: "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ",
+  hospitalDesc: "ನಿಮ್ಮ ಸ್ಥಳದ ಹತ್ತಿರ ಆಸ್ಪತ್ರೆ ಅಥವಾ ವಿಷ ಸಹಾಯ ಹುಡುಕಿ.",
+  nearestHospital: "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ",
+  poisonCenter: "ವಿಷ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ",
+  callPoison: "1800-116-117 ಕರೆ ಮಾಡಿ",
+  chatTitle: "AgriAI ಸಹಾಯಕ",
+  chatDesc: "Ollama ಚಾಲನೆಯಲ್ಲಿದ್ದರೆ ಸ್ಥಳೀಯ AI ಮಾದರಿಯಿಂದ ಉತ್ತರ ಬರುತ್ತದೆ.",
+  chatWelcome: "ರಾಸಾಯನಿಕದ ಹೆಸರು, ಸಂಪರ್ಕ ಹೇಗೆ ಆಯಿತು, ಮತ್ತು ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ.",
+  voiceInput: "ಧ್ವನಿ ಇನ್‌ಪುಟ್",
+  recordVoice: "ಧ್ವನಿ ರೆಕಾರ್ಡ್",
+  voiceOn: "Voice ON",
+  voiceOff: "Voice OFF",
+  voiceStatus: "ಧ್ವನಿ ಇನ್‌ಪುಟ್ ನಿಮ್ಮ ಬ್ರೌಸರ್ speech tools ಬಳಸಿ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
+  selectedLanguage: "ಕನ್ನಡ",
+  chatPlaceholder: "ಕೇಳಿ: ನಾನು chlorpyrifos spray ಮಾಡಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ, ಏನು ಮಾಡಲಿ?",
+  send: "ಕಳುಹಿಸಿ",
+  symptomLabels: ["ತಲೆನೋವು", "ವಾಂತಿ", "ತಲೆ ಸುತ್ತುವುದು", "ಕಣ್ಣು ಉರಿ", "ಉಸಿರಾಟ ತೊಂದರೆ", "ಹೆಚ್ಚು ಬೆವರು", "ಮಾಂಸಖಂಡ ಫಡಕುವುದು", "ಗೊಂದಲ"],
+};
+
 function uiLanguage() {
   const selected = currentLanguage();
   if (selected === "auto") return detectedAutoLanguage;
@@ -212,7 +304,6 @@ function applyUILanguage() {
   if (imageResult.classList.contains("muted")) imageResult.textContent = text.imageResult;
   symptomText.placeholder = text.symptomText;
   symptomBtn.textContent = text.analyzeSymptoms;
-  contactInput.placeholder = text.contact;
   locationBtn.textContent = text.location;
   alertBtn.textContent = text.createAlert;
   emergencyMessage.placeholder = text.emergencyMessage;
@@ -368,22 +459,7 @@ async function createAlert() {
   const data = await response.json();
   emergencyMessage.value = data.message;
 
-  const phone = normalizePhone(contactInput.value.trim());
-  const encoded = encodeURIComponent(data.message);
-  const smsSeparator = /iPad|iPhone|iPod/.test(navigator.userAgent) ? "&" : "?";
-  smsLink.href = phone ? `sms:${phone}${smsSeparator}body=${encoded}` : `sms:${smsSeparator}body=${encoded}`;
-  whatsappLink.href = phone ? `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}` : `https://api.whatsapp.com/send?text=${encoded}`;
-  smsLink.target = "_self";
-  whatsappLink.target = "_blank";
-  smsLink.classList.remove("disabled");
-  whatsappLink.classList.remove("disabled");
-}
-
-function normalizePhone(rawPhone) {
-  const digits = rawPhone.replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.length === 10) return `91${digits}`;
-  return digits;
+  alertBtn.textContent = "Message ready";
 }
 
 function addMessage(text, type) {
@@ -594,7 +670,7 @@ async function sendChat() {
       body: JSON.stringify({
         message,
         chemical: chemicalInput.value,
-        symptoms: selectedSymptoms().join(", "),
+        symptoms: "",
         history: chatHistory.slice(-8),
         language: currentLanguage(),
       }),
@@ -648,7 +724,7 @@ async function sendChatFallback(message, pending) {
       body: JSON.stringify({
         message,
         chemical: chemicalInput.value,
-        symptoms: selectedSymptoms().join(", "),
+        symptoms: "",
         history: chatHistory.slice(-8),
         language: currentLanguage(),
       }),
