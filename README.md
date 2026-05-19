@@ -59,6 +59,16 @@ Recommended low-RAM models:
 
 The app retrieves pesticide context before generation, uses compact LangChain PromptTemplates, caches Ollama replies, supports `/api/chat-stream` for streaming output, and falls back to structured safety guidance if Ollama is slow.
 
+For a more ChatGPT-like assistant, configure GitHub Models as a cloud fallback:
+
+```powershell
+$env:GITHUB_TOKEN="your_github_models_token"
+$env:GITHUB_MODEL="gpt-4o-mini"
+python app.py
+```
+
+AgriAI tries Ollama first, then GitHub Models, then its local pesticide/RAG fallback.
+
 ## Language And Voice
 
 Use the language selector in the header:
@@ -101,6 +111,16 @@ python app.py
 Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. The OCR service applies grayscale conversion, contrast enhancement, sharpening, OpenCV resizing, adaptive thresholding, Otsu thresholding, Tesseract OCR, and optional EasyOCR/TrOCR fallback.
 
 Because `HF_LOCAL_ONLY=1`, Hugging Face models must already be cached locally. Set `HF_LOCAL_ONLY=0` only if you want Transformers to download models.
+
+Hosted Hugging Face OCR is also supported:
+
+```powershell
+$env:HF_API_TOKEN="your_huggingface_token"
+$env:HF_OCR_MODEL="microsoft/trocr-base-printed"
+python app.py
+```
+
+If Tesseract/EasyOCR/TrOCR are not installed locally and `HF_API_TOKEN` is not set, AgriAI will still analyze typed label text, filename, and chemical hints, but it cannot reliably read a photo-only label.
 
 ## RAG Knowledge Base
 

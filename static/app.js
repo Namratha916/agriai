@@ -593,19 +593,24 @@ function toggleVoiceReply() {
 
 function speakText(text) {
   if (!state.voiceEnabled || !text) return;
-  if (!("speechSynthesis" in window)) return speakWithServerTTS(text);
+  const lang = uiLanguage();
+  if (lang === "kn" || lang === "hi") {
+    speakWithServerTTS(text, true);
+    return;
+  }
+  if (!("speechSynthesis" in window)) return speakWithServerTTS(text, false);
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = speechLang(text);
   const voice = chooseVoice(utterance.lang);
   if (voice) utterance.voice = voice;
   utterance.rate = 0.95;
-  utterance.onerror = () => speakWithServerTTS(text);
+  utterance.onerror = () => speakWithServerTTS(text, false);
   window.speechSynthesis.speak(utterance);
   lockVoiceStatus(`Speaking in ${utterance.lang}.`);
 }
 
-async function speakWithServerTTS(text) {
+async function speakWithServerTTS(text, fallbackToBrowser = true) {
   if (!state.voiceEnabled) return;
   try {
     const response = await fetch("/api/text-to-speech", {
@@ -621,6 +626,17 @@ async function speakWithServerTTS(text) {
     fallbackAudio.play();
     lockVoiceStatus(`Speaking in ${data.language}.`);
   } catch {
+    if (fallbackToBrowser && "speechSynthesis" in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = speechLang(text);
+      const voice = chooseVoice(utterance.lang);
+      if (voice) utterance.voice = voice;
+      utterance.rate = 0.9;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      lockVoiceStatus(`Browser voice fallback in ${utterance.lang}.`);
+      return;
+    }
     lockVoiceStatus("Voice output is unavailable in this browser.");
   }
 }

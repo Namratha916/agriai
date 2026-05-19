@@ -13,6 +13,7 @@ from flask import Flask, Response, jsonify, render_template, request
 from prompt_templates import GENERAL_CHAT_PROMPT, IMAGE_ANALYSIS_PROMPT, SAFETY_RESPONSE_PROMPT, language_name
 from services.ocr_service import OCRService
 from services.ollama_service import OllamaClient
+from services.cloud_chat_service import GitHubModelsClient
 from services.pesticide_service import PesticideKnowledgeBase
 from services.rag_service import RAGService
 from services.voice_service import speech_to_text, text_to_speech_audio
@@ -38,6 +39,7 @@ OCR = OCRService(
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
+CLOUD_CHAT = GitHubModelsClient()
 
 
 def load_pesticides() -> list[dict[str, Any]]:
@@ -287,6 +289,14 @@ def classify_chat_intent(user_message: str, chemical_name: str = "", symptoms_te
     info_question_starts = (
         "what is",
         "what are",
+        "what precautions",
+        "what precaution",
+        "precautions",
+        "safety tips",
+        "safe use",
+        "how to use",
+        "used for",
+        "use of",
         "define",
         "explain",
         "tell me",
@@ -301,6 +311,17 @@ def classify_chat_intent(user_message: str, chemical_name: str = "", symptoms_te
         "disadvantages",
         "why",
         "how",
+    )
+    info_question_contains = (
+        "precaution",
+        "precautions",
+        "safety tips",
+        "used for",
+        "use for",
+        "usage",
+        "side effects",
+        "first aid",
+        "toxicity",
     )
     exposure_story_words = (
         "i sprayed",
@@ -317,7 +338,7 @@ def classify_chat_intent(user_message: str, chemical_name: str = "", symptoms_te
         "vomiting",
         "breathing difficulty",
     )
-    if clean_message.startswith(info_question_starts) and not any(word in combined for word in exposure_story_words):
+    if (clean_message.startswith(info_question_starts) or any(word in clean_message for word in info_question_contains)) and not any(word in combined for word in exposure_story_words):
         return "general"
 
     if any(word in combined for word in ("hospital", "doctor", "clinic", "poison control", "helpline", "emergency", "ambulance")):
@@ -828,6 +849,14 @@ def api_chat():
     except Exception:
         pass
 
+    try:
+        reply = CLOUD_CHAT.chat(messages, safety_mode=is_safety_intent)
+        unsafe_additions = ("eat", "food", "drink water", "induce vomiting", "take medicine")
+        if reply and (not is_safety_intent or not any(term in reply.lower() for term in unsafe_additions)):
+            return jsonify({"reply": reply, "model": os.getenv("GITHUB_MODEL", "gpt-4o-mini"), "rag_context_used": bool(rag_context)})
+    except Exception:
+        pass
+
     if is_safety_intent:
         return jsonify({"reply": safety_reply, "model": "agriai-fast"})
 
@@ -951,7 +980,17 @@ def api_chat_stream():
                     except Exception:
                         continue
         except Exception:
-            fallback = safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language)
+            try:
+                cloud_reply = CLOUD_CHAT.chat(
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    safety_mode=is_safety_intent,
+                )
+            except Exception:
+                cloud_reply = None
+            fallback = cloud_reply or (safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language))
             yield f"data: {json.dumps({'token': fallback})}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -1065,11 +1104,13 @@ def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text:
 def build_general_fallback_reply(user_message: str, chemical_name: str, rag_context: str, language: str = "en") -> str:
     pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
     if pesticide:
+        details = KB.structured_details(pesticide, [])
         reply = (
             f"{pesticide.get('name')} is a {pesticide.get('category', 'pesticide')}. "
             f"Danger level: {pesticide.get('danger_level', 'Unknown')}. "
             f"Possible symptoms include {', '.join(pesticide.get('symptoms', [])) or 'irritation or poisoning symptoms'}. "
-            f"First aid: {pesticide.get('first_aid', 'Stop exposure, wash exposed areas, and seek medical advice if symptoms appear.')}"
+            f"First aid: {pesticide.get('first_aid', 'Stop exposure, wash exposed areas, and seek medical advice if symptoms appear.')} "
+            f"Precautions: {'; '.join(details.get('safety_precautions', []))}"
         )
     elif rag_context:
         reply = "Here is the relevant pesticide-safety guidance I found: " + " ".join(rag_context.split())[:650]

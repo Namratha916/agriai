@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from io import BytesIO
+import os
 from typing import Any
+
+import requests
 
 
 @dataclass
@@ -49,6 +52,10 @@ class OCRService:
                 texts.append(trocr_text)
         else:
             result.errors.append("deep_ocr_disabled: set AGRIAI_DEEP_OCR=1 to enable EasyOCR/TrOCR")
+
+        hf_api_text = self._run_huggingface_api(image_bytes, result)
+        if hf_api_text:
+            texts.append(hf_api_text)
 
         result.text = "\n".join(dedupe_lines(texts)).strip()
         if not result.text:
@@ -169,6 +176,33 @@ class OCRService:
             return text.strip()
         except Exception as exc:
             result.errors.append(f"trocr_unavailable: {exc}")
+            return ""
+
+    def _run_huggingface_api(self, image_bytes: bytes, result: OCRResult) -> str:
+        token = os.getenv("HF_API_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        if not token:
+            result.errors.append("hf_api_unavailable: set HF_API_TOKEN for hosted Hugging Face OCR")
+            return ""
+        try:
+            model = self.trocr_model or "microsoft/trocr-base-printed"
+            response = requests.post(
+                f"https://api-inference.huggingface.co/models/{model}",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/octet-stream"},
+                data=image_bytes,
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            text = ""
+            if isinstance(payload, list) and payload:
+                text = payload[0].get("generated_text", "") or payload[0].get("text", "")
+            elif isinstance(payload, dict):
+                text = payload.get("generated_text", "") or payload.get("text", "")
+            if text.strip():
+                result.engines_used.append("huggingface-api")
+            return text.strip()
+        except Exception as exc:
+            result.errors.append(f"hf_api_ocr_unavailable: {exc}")
             return ""
 
 
