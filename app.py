@@ -29,7 +29,7 @@ MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama").lower().strip()
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_URL = os.getenv("OLLAMA_URL", f"{OLLAMA_BASE_URL}/api/chat")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
-OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "25"))
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "3"))
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 GROK_MODEL = os.getenv("GROK_MODEL", "grok-4.3")
 HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
@@ -41,6 +41,7 @@ OCR = OCRService(
     trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
     local_only=HF_LOCAL_ONLY,
     enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "1") == "1",
+    enable_trocr=os.getenv("AGRIAI_ENABLE_TROCR", "0") == "1",
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)

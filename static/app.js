@@ -40,6 +40,7 @@ const state = {
   detectedAutoLanguage: "en",
   voiceEnabled: localStorage.getItem("agriaiVoiceEnabled") !== "false",
   voiceAutoSend: localStorage.getItem("agriaiVoiceAutoSend") !== "false",
+  voiceListening: false,
 };
 
 const UI_TEXT = {
@@ -503,30 +504,29 @@ function setupSpeechRecognition() {
   }
   recognition = new SpeechRecognition();
   recognition.continuous = false;
-  recognition.interimResults = true;
+  recognition.interimResults = false;
   recognition.maxAlternatives = 3;
   recognition.onstart = () => {
+    state.voiceListening = true;
     el.micBtn.classList.add("listening");
-    el.micBtn.textContent = "Listening...";
+    el.micBtn.textContent = "Stop listening";
     stopSpeaking();
     lockVoiceStatus("Speak now.");
   };
   recognition.onresult = (event) => {
-    let transcript = "";
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      transcript += event.results[index][0].transcript;
-    }
+    const transcript = event.results[0]?.[0]?.transcript || "";
+    if (!transcript.trim()) return;
     if (el.chatInput) {
       el.chatInput.value = transcript;
       el.chatInput.focus();
     }
     updateAutoLanguageFromText(transcript);
-    const isFinal = event.results[event.results.length - 1].isFinal;
-    lockVoiceStatus(isFinal ? `${(UI_TEXT[uiLanguage()] || UI_TEXT.en).voiceEdit} Heard: ${transcript}` : `Listening: ${transcript}`);
-    if (isFinal && state.voiceAutoSend) sendChat();
+    lockVoiceStatus(`${(UI_TEXT[uiLanguage()] || UI_TEXT.en).voiceEdit} Heard: ${transcript}`);
+    if (state.voiceAutoSend) sendChat();
   };
   recognition.onerror = (event) => lockVoiceStatus(`Voice input failed${event?.error ? `: ${event.error}` : ""}. Please try again or type.`);
   recognition.onend = () => {
+    state.voiceListening = false;
     el.micBtn.classList.remove("listening");
     applyLanguage();
   };
@@ -534,6 +534,10 @@ function setupSpeechRecognition() {
 
 function startVoiceInput() {
   if (!recognition) return;
+  if (state.voiceListening) {
+    recognition.stop();
+    return;
+  }
   recognition.lang = speechLang();
   try {
     recognition.start();

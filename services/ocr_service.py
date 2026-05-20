@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from io import BytesIO
 import os
+import shutil
 from typing import Any
 
 import requests
@@ -22,12 +23,15 @@ class OCRService:
         trocr_model: str = "microsoft/trocr-base-printed",
         local_only: bool = False,
         enable_deep_ocr: bool = False,
+        enable_trocr: bool = False,
     ):
         self.trocr_model = trocr_model
         self.local_only = local_only
         self.enable_deep_ocr = enable_deep_ocr
+        self.enable_trocr = enable_trocr
         self._easyocr_reader = None
         self._trocr = None
+        self._tesseract_available = shutil.which("tesseract") is not None
 
     def analyze(self, image_bytes: bytes) -> OCRResult:
         result = OCRResult(text="")
@@ -42,14 +46,17 @@ class OCRService:
                 texts.append(tesseract_text)
 
         if self.enable_deep_ocr:
-            best_image = images[-1][1]
+            best_image = images[0][1]
             easyocr_text = self._run_easyocr(best_image, result)
             if easyocr_text:
                 texts.append(easyocr_text)
 
-            trocr_text = self._run_trocr(best_image, result)
-            if trocr_text:
-                texts.append(trocr_text)
+            if self.enable_trocr:
+                trocr_text = self._run_trocr(best_image, result)
+                if trocr_text:
+                    texts.append(trocr_text)
+            else:
+                result.errors.append("trocr_skipped: set AGRIAI_ENABLE_TROCR=1 to enable TrOCR")
         else:
             result.errors.append("deep_ocr_disabled: set AGRIAI_DEEP_OCR=1 to enable EasyOCR/TrOCR")
 
@@ -72,7 +79,7 @@ class OCRService:
             from PIL import Image, ImageEnhance, ImageFilter
 
             image = Image.open(BytesIO(image_bytes)).convert("RGB")
-            max_side = 2200
+            max_side = 1200
             image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
             gray = image.convert("L")
             gray = ImageEnhance.Contrast(gray).enhance(2.0)
@@ -115,6 +122,10 @@ class OCRService:
             return []
 
     def _run_tesseract(self, image: Any, result: OCRResult, variant_name: str) -> str:
+        if not self._tesseract_available:
+            if not any(error.startswith("tesseract_unavailable") for error in result.errors):
+                result.errors.append("tesseract_unavailable: install Tesseract OCR or use EasyOCR/Hugging Face OCR")
+            return ""
         try:
             import pytesseract
 

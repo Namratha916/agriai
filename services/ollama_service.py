@@ -37,7 +37,7 @@ class OllamaClient:
             "messages": messages,
         }
         try:
-            response = requests.post(self.url, json=payload, timeout=self.timeout)
+            response = requests.post(self.url, json=payload, timeout=(1.0, min(self.timeout, 3)))
             response.raise_for_status()
             reply = response.json().get("message", {}).get("content", "").strip()
             if reply:
