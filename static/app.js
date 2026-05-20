@@ -39,7 +39,7 @@ const state = {
   chatHistory: [],
   detectedAutoLanguage: "en",
   voiceEnabled: localStorage.getItem("agriaiVoiceEnabled") !== "false",
-  voiceAutoSend: localStorage.getItem("agriaiVoiceAutoSend") === "true",
+  voiceAutoSend: localStorage.getItem("agriaiVoiceAutoSend") !== "false",
 };
 
 const UI_TEXT = {
@@ -50,8 +50,8 @@ const UI_TEXT = {
     recordVoice: "Record voice",
     voiceOn: "Voice ON",
     voiceOff: "Voice OFF",
-    voiceReady: "Voice ready. I will put the transcript in the box first.",
-    voiceEdit: "Transcript added. Check it, then press Send.",
+    voiceReady: "Voice ready. Speak and I will send the transcript automatically.",
+    voiceEdit: "Transcript heard and ready to send.",
     selectedLanguage: "English",
     send: "Send",
     analyzing: "Analyzing photo...",
@@ -508,6 +508,7 @@ function setupSpeechRecognition() {
   recognition.onstart = () => {
     el.micBtn.classList.add("listening");
     el.micBtn.textContent = "Listening...";
+    stopSpeaking();
     lockVoiceStatus("Speak now.");
   };
   recognition.onresult = (event) => {
@@ -524,7 +525,7 @@ function setupSpeechRecognition() {
     lockVoiceStatus(isFinal ? `${(UI_TEXT[uiLanguage()] || UI_TEXT.en).voiceEdit} Heard: ${transcript}` : `Listening: ${transcript}`);
     if (isFinal && state.voiceAutoSend) sendChat();
   };
-  recognition.onerror = () => lockVoiceStatus("Voice input failed. Please try again or type.");
+  recognition.onerror = (event) => lockVoiceStatus(`Voice input failed${event?.error ? `: ${event.error}` : ""}. Please try again or type.`);
   recognition.onend = () => {
     el.micBtn.classList.remove("listening");
     applyLanguage();
@@ -534,7 +535,11 @@ function setupSpeechRecognition() {
 function startVoiceInput() {
   if (!recognition) return;
   recognition.lang = speechLang();
-  recognition.start();
+  try {
+    recognition.start();
+  } catch {
+    lockVoiceStatus("Voice input is already active. Speak now.");
+  }
 }
 
 async function toggleRecording() {
@@ -579,6 +584,7 @@ async function transcribeRecording() {
     el.chatInput.value = data.text;
     updateAutoLanguageFromText(data.text);
     lockVoiceStatus(`${(UI_TEXT[uiLanguage()] || UI_TEXT.en).voiceEdit} Heard: ${data.text}`);
+    if (state.voiceAutoSend) sendChat();
   } catch (error) {
     lockVoiceStatus(error.message || "Server voice recognition is unavailable. Try browser Voice input or type.");
   }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,25 @@ class PesticideKnowledgeBase:
         for word in clean_text.split():
             if len(word) >= 5 and word in self.index:
                 return self.index[word]
+        best_match = None
+        best_score = 0.0
+        tokens = clean_text.split()
+        for alias, pesticide in self.index.items():
+            alias_tokens = alias.split()
+            if not alias_tokens or len(alias) < 5:
+                continue
+            window_size = len(alias_tokens)
+            candidates = [
+                " ".join(tokens[index:index + window_size])
+                for index in range(max(1, len(tokens) - window_size + 1))
+            ]
+            for candidate in candidates:
+                score = SequenceMatcher(None, alias, candidate).ratio()
+                if score > best_score:
+                    best_score = score
+                    best_match = pesticide
+        if best_score >= 0.82:
+            return best_match
         return self.find_group(text)
 
     def find_group(self, text: str) -> dict[str, Any] | None:

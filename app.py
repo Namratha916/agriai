@@ -788,7 +788,7 @@ def api_analyze_image():
             "ocr_errors": ocr_result.errors[:5],
             "toxicity_level": extracted["toxicity_level"],
             "toxicity_category": extracted["toxicity_category"],
-            "model": "ocr+rag+ollama" if ai_reply else "fast-ocr-rag-fallback",
+            "model": f"ocr+rag+{SELECTED_LLM.provider}" if ai_reply else "fast-ocr-rag-fallback",
         }
     )
 
@@ -1227,6 +1227,19 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
     category = extracted.get("toxicity_category") or details.get("toxicity_category", "Unknown")
     side_effects = ", ".join(details.get("side_effects", [])) or "Unknown"
     note = "" if ocr_result.text else "\nNote: OCR could not read the image clearly. Type the visible label text or pesticide name for better accuracy."
+    first_aid = details.get("first_aid") or "Move away from exposure, remove contaminated clothing, wash exposed skin, and contact a doctor if symptoms appear."
+    precautions = "; ".join(details.get("safety_precautions", [])) or "Wear gloves, mask, goggles, long sleeves, and avoid inhaling spray mist."
+    decontamination = "; ".join(details.get("decontamination_steps", [])) or "Wash exposed skin with soap and running water."
+    hospital = "Visit hospital urgently for breathing trouble, fainting, severe vomiting, eye exposure, confusion, fits, or if pesticide was swallowed."
+    return (
+        f"1. Identified pesticide/chemical: {name} (active ingredient: {active})\n"
+        f"2. Danger level: {danger}; category: {category}\n"
+        f"3. Side effects: {side_effects}\n"
+        f"4. First aid: {first_aid}\n"
+        f"5. Safety precautions: {precautions} Decontamination: {decontamination}\n"
+        f"6. When to visit hospital: {hospital}"
+        f"{note}"
+    )
     if language == "hi":
         return (
             f"1. कीटनाशक पहचान: {name}\n2. सक्रिय घटक: {active}\n3. खतरा स्तर: {danger}\n"
