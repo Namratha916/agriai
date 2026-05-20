@@ -747,9 +747,7 @@ def api_emergency_message():
 @app.post("/api/analyze-image")
 def api_analyze_image():
     uploaded_file = request.files.get("image")
-    notes = request.form.get("notes", "").strip()
-    chemical_hint = request.form.get("chemical_hint", "").strip()
-    language = resolve_language(request.form.get("language", "auto"), notes, chemical_hint)
+    language = resolve_language(request.form.get("language", "auto"))
 
     if uploaded_file is None:
         return jsonify({"reply": "Upload a pesticide label photo first.", "model": "no-image"}), 400
@@ -759,8 +757,26 @@ def api_analyze_image():
         return jsonify({"reply": "The uploaded image file is empty.", "model": "empty-image"}), 400
 
     ocr_result = OCR.analyze(image_bytes)
-    readable_text = "\n".join(part for part in [chemical_hint, notes, uploaded_file.filename, ocr_result.text] if part)
-    extracted = KB.identify_from_ocr(ocr_result.text, uploaded_file.filename, notes, chemical_hint)
+    readable_text = ocr_result.text.strip()
+    if not readable_text:
+        return jsonify(
+            {
+                "reply": (
+                    "OCR could not read text from this image. Please retake the photo closer to the pesticide label, "
+                    "keep the product name and active ingredient in focus, and avoid glare."
+                ),
+                "details": KB.structured_details(None, []),
+                "ocr_text": "",
+                "analyzed_text": "",
+                "ocr_engines": ocr_result.engines_used,
+                "ocr_errors": ocr_result.errors[:5],
+                "toxicity_level": "Unreadable image",
+                "toxicity_category": "OCR failed",
+                "model": "ocr-unreadable",
+            }
+        ), 422
+
+    extracted = KB.identify_from_ocr(ocr_result.text)
     details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"], extracted.get("product_guess", ""))
     rag_context = RAG.context(f"{details['pesticide_name']} {readable_text}", top_k=3)
     pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
@@ -769,8 +785,8 @@ def api_analyze_image():
     ai_reply = None
     if AI_IMAGE_EXPLANATION or SELECTED_LLM.provider == "grok":
         provider_messages = build_provider_messages(
-            user_message=notes or chemical_hint or "Analyze this pesticide label image.",
-            chemical_name=chemical_hint,
+            user_message="Analyze this pesticide label image using only OCR text.",
+            chemical_name="",
             symptoms="",
             rag_context=pesticide_context,
             image_text=readable_text or "No readable text was extracted.",
@@ -871,6 +887,10 @@ def api_chat():
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
     exposure_route = detect_exposure_route(f"{user_message} {symptoms}") or "Unknown"
     rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
+
+    if SELECTED_LLM.provider == "ollama":
+        fallback_reply = safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language)
+        return jsonify({"reply": fallback_reply, "model": "agriai-fast", "provider": "built-in", "rag_context_used": bool(rag_context)})
 
     if is_safety_intent:
         system_prompt = "You are AgriAI. Give short, medically safe pesticide guidance grounded in retrieved context."
@@ -1003,6 +1023,16 @@ def api_chat_stream():
     rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
     pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
+
+    if SELECTED_LLM.provider == "ollama":
+        fast_reply = safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language)
+
+        def fast_generate():
+            yield f"data: {json.dumps({'token': fast_reply, 'model': 'agriai-fast', 'provider': 'built-in'})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return Response(fast_generate(), mimetype="text/event-stream")
+
     provider_messages = build_provider_messages(
         user_message=user_message,
         chemical_name=chemical_name,

@@ -689,8 +689,6 @@ async function analyzeImage() {
 
   const formData = new FormData();
   formData.append("image", file);
-  formData.append("notes", el.imageNotes?.value || "");
-  formData.append("chemical_hint", el.chemicalInput?.value || "");
   formData.append("language", currentLanguage());
 
   try {
@@ -699,9 +697,6 @@ async function analyzeImage() {
     if (!response.ok) throw new Error(data.reply || data.error || "Image analysis failed.");
     el.imageResult.className = "result-box";
     el.imageResult.innerHTML = renderImageAnalysis(data);
-    if (!data.ocr_text && !data.analyzed_text?.trim()) {
-      el.imageResult.insertAdjacentHTML("beforeend", `<div class="result-box warning-box">${escapeHtml(text.imageHelp)}</div>`);
-    }
     speakText(data.reply || "");
   } catch (error) {
     setResult(el.imageResult, error.message, true);

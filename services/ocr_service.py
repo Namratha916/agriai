@@ -46,13 +46,15 @@ class OCRService:
                 texts.append(tesseract_text)
 
         if self.enable_deep_ocr:
-            best_image = images[0][1]
-            easyocr_text = self._run_easyocr(best_image, result)
-            if easyocr_text:
-                texts.append(easyocr_text)
+            for _, candidate_image in images[:4]:
+                easyocr_text = self._run_easyocr(candidate_image, result)
+                if easyocr_text:
+                    texts.append(easyocr_text)
+                    if len(easyocr_text) >= 12:
+                        break
 
             if self.enable_trocr:
-                trocr_text = self._run_trocr(best_image, result)
+                trocr_text = self._run_trocr(images[0][1], result)
                 if trocr_text:
                     texts.append(trocr_text)
             else:
@@ -84,7 +86,7 @@ class OCRService:
             gray = image.convert("L")
             gray = ImageEnhance.Contrast(gray).enhance(2.0)
             gray = gray.filter(ImageFilter.SHARPEN)
-            variants = [("gray_sharp", gray)]
+            variants = [("original", image), ("gray_sharp", gray)]
 
             try:
                 import cv2
@@ -156,7 +158,14 @@ class OCRService:
                     self._easyocr_reader = easyocr.Reader(["en", "hi", "kn"], gpu=False, verbose=False)
                 except Exception:
                     self._easyocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-            values = self._easyocr_reader.readtext(np.array(image), detail=1, paragraph=True)
+            values = self._easyocr_reader.readtext(
+                np.array(image),
+                detail=1,
+                paragraph=False,
+                width_ths=0.7,
+                text_threshold=0.5,
+                low_text=0.3,
+            )
             chunks = []
             confidences = []
             for item in values:
