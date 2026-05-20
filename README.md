@@ -34,30 +34,85 @@ Open `http://127.0.0.1:5000`.
 
 ## Ollama Chatbot
 
-Install and run Ollama separately, then pull a model:
+AgriAI supports model switching with `MODEL_PROVIDER`.
+
+Use local Ollama for testing:
 
 ```powershell
-ollama pull phi3:mini
-ollama pull tinyllama
+ollama pull mistral
 ollama serve
 ```
 
-Optional environment variables:
-
 ```powershell
-$env:OLLAMA_MODEL="phi3:mini"
-$env:OLLAMA_URL="http://localhost:11434/api/chat"
+$env:MODEL_PROVIDER="ollama"
+$env:OLLAMA_BASE_URL="http://localhost:11434"
+$env:OLLAMA_MODEL="mistral"
 $env:OLLAMA_TIMEOUT="90"
 python app.py
 ```
 
-Recommended low-RAM models:
+Use xAI Grok for production/deployment:
 
-- `phi3:mini`: better quality on 8GB RAM systems.
-- `tinyllama`: fastest fallback, lower quality.
-- `mistral:latest`: better quality if the laptop can handle it.
+```powershell
+$env:MODEL_PROVIDER="grok"
+$env:XAI_API_KEY="your_xai_api_key"
+$env:GROK_MODEL="grok-4.3"
+python app.py
+```
 
-The app retrieves pesticide context before generation, uses compact LangChain PromptTemplates, caches Ollama replies, supports `/api/chat-stream` for streaming output, and falls back to structured safety guidance if Ollama is slow.
+Both Grok and Ollama use this prompt format with retrieved pesticide context:
+
+```text
+You are AgriAI, a pesticide safety Generative AI assistant.
+Reply in the selected language: {language}.
+Use the given pesticide context.
+If image text is provided, identify pesticide or chemical name.
+Give short, clear, farmer-friendly answer.
+
+Context:
+{context}
+
+Image text:
+{image_text}
+
+User question:
+{question}
+
+Answer format:
+1. Identified pesticide/chemical
+2. Danger level
+3. Side effects
+4. First aid
+5. Safety precautions
+6. When to visit hospital
+```
+
+If `MODEL_PROVIDER=grok` but `XAI_API_KEY` is missing, the app returns a clear fallback message. Existing Ollama/local model support remains available with `MODEL_PROVIDER=ollama`.
+
+## Vercel Deployment With Grok
+
+1. Import the GitHub repository in Vercel.
+2. Add environment variables:
+
+```text
+MODEL_PROVIDER=grok
+XAI_API_KEY=your_xai_api_key
+GROK_MODEL=grok-4.3
+HF_LOCAL_ONLY=1
+AI_IMAGE_EXPLANATION=0
+AGRIAI_ENABLE_CHROMA=0
+```
+
+3. Deploy. `vercel.json` routes requests to `app.py`.
+
+## GitHub Commit Commands
+
+```powershell
+git status
+git add .
+git commit -m "Add Grok API provider support"
+git push origin main
+```
 
 For a more ChatGPT-like assistant, configure GitHub Models as a cloud fallback:
 

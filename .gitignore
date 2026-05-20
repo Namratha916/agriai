@@ -9,6 +9,7 @@ data/users.json
 .ruff_cache/
 instance/
 vector_store/
+easyocr_models/
 *.mp3
 *.wav
 .DS_Store

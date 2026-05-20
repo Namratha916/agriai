@@ -93,5 +93,27 @@ IMAGE_ANALYSIS_PROMPT = make_prompt(
 )
 
 
+AGRIAI_PROVIDER_PROMPT = make_prompt(
+    template=(
+        "You are AgriAI, a pesticide safety Generative AI assistant.\n"
+        "Reply in the selected language: {language}.\n"
+        "Use the given pesticide context.\n"
+        "If image text is provided, identify pesticide or chemical name.\n"
+        "Give short, clear, farmer-friendly answer.\n\n"
+        "Context:\n{context}\n\n"
+        "Image text:\n{image_text}\n\n"
+        "User question:\n{question}\n\n"
+        "Answer format:\n"
+        "1. Identified pesticide/chemical\n"
+        "2. Danger level\n"
+        "3. Side effects\n"
+        "4. First aid\n"
+        "5. Safety precautions\n"
+        "6. When to visit hospital\n"
+    ),
+    input_variables=["language", "context", "image_text", "question"],
+)
+
+
 def language_name(language: str) -> str:
     return LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["auto"])

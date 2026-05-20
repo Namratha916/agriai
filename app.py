@@ -10,7 +10,8 @@ from typing import Any
 import requests
 from flask import Flask, Response, jsonify, render_template, request
 
-from prompt_templates import GENERAL_CHAT_PROMPT, IMAGE_ANALYSIS_PROMPT, SAFETY_RESPONSE_PROMPT, language_name
+from chatbot.llm import AgriAILLM, ModelConfig
+from prompt_templates import AGRIAI_PROVIDER_PROMPT, GENERAL_CHAT_PROMPT, IMAGE_ANALYSIS_PROMPT, SAFETY_RESPONSE_PROMPT, language_name
 from services.ocr_service import OCRService
 from services.ollama_service import OllamaClient
 from services.cloud_chat_service import GitHubModelsClient
@@ -24,9 +25,13 @@ DATA_PATH = BASE_DIR / "data" / "pesticides.json"
 DOCS_DIR = BASE_DIR / "knowledge"
 VECTOR_DIR = BASE_DIR / "vector_store"
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama").lower().strip()
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+OLLAMA_URL = os.getenv("OLLAMA_URL", f"{OLLAMA_BASE_URL}/api/chat")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "25"))
+XAI_API_KEY = os.getenv("XAI_API_KEY", "")
+GROK_MODEL = os.getenv("GROK_MODEL", "grok-4.3")
 HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "0") == "1"
 AI_IMAGE_EXPLANATION = os.getenv("AI_IMAGE_EXPLANATION", "0") == "1"
 
@@ -39,12 +44,66 @@ OCR = OCRService(
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
+SELECTED_LLM = AgriAILLM(
+    ModelConfig(
+        provider=MODEL_PROVIDER,
+        ollama_base_url=OLLAMA_BASE_URL,
+        ollama_model=OLLAMA_MODEL,
+        xai_api_key=XAI_API_KEY,
+        grok_model=GROK_MODEL,
+        timeout=OLLAMA_TIMEOUT,
+    )
+)
 CLOUD_CHAT = GitHubModelsClient()
 
 
 def load_pesticides() -> list[dict[str, Any]]:
     with DATA_PATH.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+def build_provider_messages(
+    user_message: str,
+    chemical_name: str,
+    symptoms: str,
+    rag_context: str,
+    image_text: str,
+    language: str,
+) -> list[dict[str, str]]:
+    pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
+    pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
+    context = (
+        f"Detected pesticide: {pesticide_name}\n"
+        f"Detected symptoms: {symptoms or ', '.join(extract_symptoms(user_message)) or 'Not provided'}\n"
+        f"Exposure route: {detect_exposure_route(f'{user_message} {symptoms}') or 'Unknown'}\n\n"
+        f"{rag_context or 'No pesticide context retrieved.'}"
+    )
+    prompt = AGRIAI_PROVIDER_PROMPT.format(
+        language=language_name(language),
+        context=context,
+        image_text=image_text or "No image text provided.",
+        question=user_message,
+    )
+    return [
+        {"role": "system", "content": "You are AgriAI. Follow the requested pesticide safety answer format and stay medically conservative."},
+        {"role": "user", "content": prompt},
+    ]
+
+
+def selected_llm_reply(
+    messages: list[dict[str, str]],
+    safety_mode: bool,
+    fallback_reply: str,
+) -> tuple[str | None, str, str]:
+    if SELECTED_LLM.provider == "grok" and not XAI_API_KEY:
+        return "Grok API is selected, but XAI_API_KEY is not configured. Add XAI_API_KEY or switch MODEL_PROVIDER=ollama.", "grok-not-configured", "grok"
+    try:
+        result = SELECTED_LLM.chat(messages, safety_mode=safety_mode)
+        if result:
+            return result.text, result.model, result.provider
+    except Exception:
+        pass
+    return fallback_reply, "agriai-provider-fallback", "built-in"
 
 
 PESTICIDES = KB.pesticides
@@ -266,13 +325,14 @@ def find_chemical_group(text: str) -> dict[str, Any] | None:
 
 def detect_exposure_route(text: str) -> str | None:
     clean_text = normalize(text)
-    if any(word in clean_text for word in ("swallow", "swallowed", "drink", "drank", "ingest", "ingested", "ate")):
+    tokens = set(clean_text.split())
+    if tokens & {"swallow", "swallowed", "drink", "drank", "ingest", "ingested", "ate"}:
         return "ingestion"
-    if any(word in clean_text for word in ("eye", "eyes", "splash")):
+    if tokens & {"eye", "eyes", "splash", "splashed"}:
         return "eye"
-    if any(word in clean_text for word in ("breathe", "breathing", "inhale", "inhaled", "smell", "spray mist")):
+    if tokens & {"breathe", "breathing", "inhale", "inhaled", "smell", "spray", "sprayed", "spraying"} or "spray mist" in clean_text:
         return "inhalation"
-    if any(word in clean_text for word in ("skin", "hand", "hands", "clothes", "body", "touch", "touched")):
+    if tokens & {"skin", "hand", "hands", "clothes", "body", "touch", "touched"}:
         return "skin"
     return None
 
@@ -706,19 +766,16 @@ def api_analyze_image():
 
     fallback_reply = format_image_report(details, ocr_result, extracted, language)
     ai_reply = None
-    if AI_IMAGE_EXPLANATION:
-        prompt = IMAGE_ANALYSIS_PROMPT.format(
-            language=language_name(language),
-            ocr_text=readable_text or "No readable text was extracted.",
-            pesticide_context=pesticide_context,
+    if AI_IMAGE_EXPLANATION or SELECTED_LLM.provider == "grok":
+        provider_messages = build_provider_messages(
+            user_message=notes or chemical_hint or "Analyze this pesticide label image.",
+            chemical_name=chemical_hint,
+            symptoms="",
+            rag_context=pesticide_context,
+            image_text=readable_text or "No readable text was extracted.",
+            language=language,
         )
-        ai_reply = OLLAMA.chat(
-            [
-                {"role": "system", "content": "You are AgriAI. Create concise pesticide label safety reports only from provided OCR/database context."},
-                {"role": "user", "content": prompt},
-            ],
-            safety_mode=True,
-        )
+        ai_reply, _, _ = selected_llm_reply(provider_messages, True, "")
     reply = ai_reply or fallback_reply
 
     return jsonify(
@@ -840,12 +897,25 @@ def api_chat():
             if role in {"user", "assistant"} and content:
                 messages.append({"role": role, "content": content[:1000]})
     messages.append({"role": "user", "content": user_content})
+    provider_messages = build_provider_messages(
+        user_message=user_message,
+        chemical_name=chemical_name,
+        symptoms=symptoms,
+        rag_context=rag_context,
+        image_text="",
+        language=prompt_language,
+    )
 
     try:
-        reply = OLLAMA.chat(messages, safety_mode=is_safety_intent)
+        if SELECTED_LLM.provider == "grok":
+            reply, model_name, provider_name = selected_llm_reply(provider_messages, is_safety_intent, safety_reply)
+        else:
+            reply = OLLAMA.chat(provider_messages, safety_mode=is_safety_intent)
+            model_name = OLLAMA_MODEL
+            provider_name = "ollama"
         unsafe_additions = ("eat", "food", "drink water", "induce vomiting", "take medicine")
         if reply and (not is_safety_intent or not any(term in reply.lower() for term in unsafe_additions)):
-            return jsonify({"reply": reply, "model": OLLAMA_MODEL, "rag_context_used": bool(rag_context)})
+            return jsonify({"reply": reply, "model": model_name, "provider": provider_name, "rag_context_used": bool(rag_context)})
     except Exception:
         pass
 
@@ -932,6 +1002,14 @@ def api_chat_stream():
     rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
     pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
+    provider_messages = build_provider_messages(
+        user_message=user_message,
+        chemical_name=chemical_name,
+        symptoms=symptoms,
+        rag_context=rag_context,
+        image_text="",
+        language=prompt_language,
+    )
 
     if is_safety_intent:
         prompt = SAFETY_RESPONSE_PROMPT.format(
@@ -951,6 +1029,15 @@ def api_chat_stream():
         )
         system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
 
+    if SELECTED_LLM.provider == "grok":
+        reply, model_name, provider_name = selected_llm_reply(provider_messages, is_safety_intent, safety_reply)
+
+        def grok_generate():
+            yield f"data: {json.dumps({'token': reply, 'model': model_name, 'provider': provider_name})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return Response(grok_generate(), mimetype="text/event-stream")
+
     def generate():
         try:
             with requests.post(
@@ -960,10 +1047,7 @@ def api_chat_stream():
                     "stream": True,
                     "keep_alive": "10m",
                     "options": {"num_predict": 140, "num_ctx": 1400, "temperature": 0.2 if is_safety_intent else 0.55},
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
+                    "messages": provider_messages,
                 },
                 stream=True,
                 timeout=OLLAMA_TIMEOUT,
