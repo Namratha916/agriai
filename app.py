@@ -1318,6 +1318,6 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
 
 
 if __name__ == "__main__":
-    threading.Thread(target=warm_ollama_model, daemon=True).start()
-    threading.Thread(target=warm_ocr_model, daemon=True).start()
-    app.run(debug=True)
+    if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
