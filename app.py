@@ -40,8 +40,8 @@ KB = PesticideKnowledgeBase(DATA_PATH)
 OCR = OCRService(
     trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
     local_only=HF_LOCAL_ONLY,
-    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "1") == "1",
-    enable_trocr=os.getenv("AGRIAI_ENABLE_TROCR", "0") == "1",
+    enable_deep_ocr=False,
+    enable_trocr=False,
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
@@ -1315,9 +1315,6 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
         "10. Emergency Recommendation: Go to hospital for breathing trouble, fainting, severe vomiting, eye exposure, or swallowing pesticide."
         f"{note}"
     )
-
-
 if __name__ == "__main__":
-    if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
