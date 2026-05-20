@@ -1116,6 +1116,21 @@ def warm_ollama_model() -> None:
     OLLAMA.warm()
 
 
+def warm_ocr_model() -> None:
+    try:
+        from io import BytesIO
+        from PIL import Image, ImageDraw
+
+        image = Image.new("RGB", (420, 120), "white")
+        drawer = ImageDraw.Draw(image)
+        drawer.text((12, 35), "CHLORPYRIFOS 20 EC", fill="black")
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        OCR.analyze(buffer.getvalue())
+    except Exception:
+        pass
+
+
 def _language_pack(language: str) -> dict[str, str]:
     packs = {
         "en": {
@@ -1304,4 +1319,5 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
 
 if __name__ == "__main__":
     threading.Thread(target=warm_ollama_model, daemon=True).start()
+    threading.Thread(target=warm_ocr_model, daemon=True).start()
     app.run(debug=True)
