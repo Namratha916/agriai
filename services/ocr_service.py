@@ -53,9 +53,12 @@ class OCRService:
         else:
             result.errors.append("deep_ocr_disabled: set AGRIAI_DEEP_OCR=1 to enable EasyOCR/TrOCR")
 
-        hf_api_text = self._run_huggingface_api(image_bytes, result)
-        if hf_api_text:
-            texts.append(hf_api_text)
+        if self.local_only:
+            result.errors.append("hf_api_skipped: local OCR mode is enabled")
+        else:
+            hf_api_text = self._run_huggingface_api(image_bytes, result)
+            if hf_api_text:
+                texts.append(hf_api_text)
 
         result.text = "\n".join(dedupe_lines(texts)).strip()
         if not result.text:

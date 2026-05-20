@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
 
 from chatbot.llm import AgriAILLM, ModelConfig
 from prompt_templates import AGRIAI_PROVIDER_PROMPT, GENERAL_CHAT_PROMPT, IMAGE_ANALYSIS_PROMPT, SAFETY_RESPONSE_PROMPT, language_name
@@ -32,7 +32,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "25"))
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 GROK_MODEL = os.getenv("GROK_MODEL", "grok-4.3")
-HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "0") == "1"
+HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
 AI_IMAGE_EXPLANATION = os.getenv("AI_IMAGE_EXPLANATION", "0") == "1"
 
 app = Flask(__name__)
@@ -617,7 +617,7 @@ def build_decontamination_steps(exposure_type: str = "skin") -> list[dict[str, s
 
 @app.get("/")
 def index():
-    return render_template("index.html", pesticides=PESTICIDES)
+    return redirect(url_for("chatbot_page"))
 
 
 @app.get("/chatbot")
