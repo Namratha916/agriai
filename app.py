@@ -40,8 +40,8 @@ KB = PesticideKnowledgeBase(DATA_PATH)
 OCR = OCRService(
     trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
     local_only=HF_LOCAL_ONLY,
-    enable_deep_ocr=False,
-    enable_trocr=False,
+    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "1") == "1",
+    enable_trocr=os.getenv("AGRIAI_ENABLE_TROCR", "0") == "1",
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
 OLLAMA = OllamaClient(OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT)
