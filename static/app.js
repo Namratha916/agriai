@@ -692,6 +692,8 @@ async function analyzeImage() {
   formData.append("language", currentLanguage());
 
   try {
+    const browserOcrText = await runBrowserOCR(file);
+    if (browserOcrText) formData.append("client_ocr_text", browserOcrText);
     const response = await fetch("/api/analyze-image", { method: "POST", body: formData });
     const data = await response.json();
     if (!response.ok && data?.details) {
@@ -710,6 +712,27 @@ async function analyzeImage() {
     el.imageAnalyzeBtn.textContent = "Analyze photo";
     applyLanguage();
   }
+}
+
+async function runBrowserOCR(file) {
+  if (!window.Tesseract?.recognize) return "";
+  try {
+    lockImageStatus("Reading label text from image...");
+    const result = await window.Tesseract.recognize(file, "eng", {
+      logger: (message) => {
+        if (message?.status === "recognizing text" && typeof message.progress === "number") {
+          lockImageStatus(`Reading label text... ${Math.round(message.progress * 100)}%`);
+        }
+      },
+    });
+    return (result?.data?.text || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function lockImageStatus(message) {
+  if (el.imageResult) setResult(el.imageResult, message);
 }
 
 function renderImageAnalysis(data) {

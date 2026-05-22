@@ -12,7 +12,7 @@ from flask import Flask, Response, jsonify, redirect, render_template, request, 
 
 from chatbot.llm import AgriAILLM, ModelConfig
 from prompt_templates import AGRIAI_PROVIDER_PROMPT, GENERAL_CHAT_PROMPT, IMAGE_ANALYSIS_PROMPT, SAFETY_RESPONSE_PROMPT, language_name
-from services.ocr_service import OCRService
+from services.ocr_service import OCRResult, OCRService
 from services.ollama_service import OllamaClient
 from services.cloud_chat_service import GitHubModelsClient
 from services.pesticide_service import PesticideKnowledgeBase
@@ -748,6 +748,7 @@ def api_emergency_message():
 def api_analyze_image():
     uploaded_file = request.files.get("image")
     language = resolve_language(request.form.get("language", "auto"))
+    client_ocr_text = request.form.get("client_ocr_text", "").strip()
 
     if uploaded_file is None:
         return jsonify({"reply": "Upload a pesticide label photo first.", "model": "no-image"}), 400
@@ -756,7 +757,10 @@ def api_analyze_image():
     if not image_bytes:
         return jsonify({"reply": "The uploaded image file is empty.", "model": "empty-image"}), 400
 
-    ocr_result = OCR.analyze(image_bytes)
+    if client_ocr_text:
+        ocr_result = OCRResult(text=client_ocr_text, engines_used=["browser-tesseract"])
+    else:
+        ocr_result = OCR.analyze(image_bytes)
     readable_text = ocr_result.text.strip()
     if not readable_text:
         return jsonify(
