@@ -46,11 +46,11 @@ class OCRService:
                 texts.append(tesseract_text)
 
         if self.enable_deep_ocr:
-            for _, candidate_image in images[:4]:
+            for _, candidate_image in images[:2]:
                 easyocr_text = self._run_easyocr(candidate_image, result)
                 if easyocr_text:
                     texts.append(easyocr_text)
-                    if len(easyocr_text) >= 12:
+                    if len("\n".join(texts)) >= 12:
                         break
 
             if self.enable_trocr:
@@ -78,13 +78,13 @@ class OCRService:
 
     def _preprocess_images(self, image_bytes: bytes, result: OCRResult):
         try:
-            from PIL import Image, ImageEnhance, ImageFilter
+            from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-            image = Image.open(BytesIO(image_bytes)).convert("RGB")
-            max_side = 1200
+            image = ImageOps.exif_transpose(Image.open(BytesIO(image_bytes))).convert("RGB")
+            max_side = 1600
             image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
             gray = image.convert("L")
-            gray = ImageEnhance.Contrast(gray).enhance(2.0)
+            gray = ImageEnhance.Contrast(gray).enhance(2.4)
             gray = gray.filter(ImageFilter.SHARPEN)
             variants = [("original", image), ("gray_sharp", gray)]
 
@@ -109,9 +109,9 @@ class OCRService:
                 variants.extend(
                     [
                         ("opencv_scaled", Image.fromarray(scaled)),
+                        ("opencv_sharpened", Image.fromarray(sharpened)),
                         ("opencv_adaptive_threshold", Image.fromarray(adaptive)),
                         ("opencv_otsu_threshold", Image.fromarray(otsu)),
-                        ("opencv_sharpened", Image.fromarray(sharpened)),
                     ]
                 )
                 result.engines_used.append("opencv-preprocess")
@@ -163,8 +163,10 @@ class OCRService:
                 detail=1,
                 paragraph=False,
                 width_ths=0.7,
-                text_threshold=0.5,
-                low_text=0.3,
+                text_threshold=0.35,
+                low_text=0.2,
+                link_threshold=0.3,
+                mag_ratio=1.1,
             )
             chunks = []
             confidences = []
