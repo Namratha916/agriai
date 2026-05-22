@@ -62,12 +62,12 @@ class OCRService:
         else:
             result.errors.append("deep_ocr_disabled: set AGRIAI_DEEP_OCR=1 to enable EasyOCR/TrOCR")
 
-        if self.local_only:
-            result.errors.append("hf_api_skipped: local OCR mode is enabled")
-        else:
+        if not any(text.strip() for text in texts):
             hf_api_text = self._run_huggingface_api(image_bytes, result)
             if hf_api_text:
                 texts.append(hf_api_text)
+        elif self.local_only:
+            result.errors.append("hf_api_skipped: local OCR already returned text")
 
         result.text = "\n".join(dedupe_lines(texts)).strip()
         if not result.text:
@@ -208,12 +208,18 @@ class OCRService:
             return ""
         try:
             model = self.trocr_model or "microsoft/trocr-base-printed"
-            response = requests.post(
-                f"https://api-inference.huggingface.co/models/{model}",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/octet-stream"},
-                data=image_bytes,
-                timeout=30,
-            )
+            response = None
+            for _ in range(2):
+                response = requests.post(
+                    f"https://api-inference.huggingface.co/models/{model}",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/octet-stream"},
+                    data=image_bytes,
+                    timeout=25,
+                )
+                if response.status_code != 503:
+                    break
+            if response is None:
+                return ""
             response.raise_for_status()
             payload = response.json()
             text = ""

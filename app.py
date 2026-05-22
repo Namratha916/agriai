@@ -32,7 +32,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "3"))
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 GROK_MODEL = os.getenv("GROK_MODEL", "grok-4.3")
-HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "1") == "1"
+HF_LOCAL_ONLY = os.getenv("HF_LOCAL_ONLY", "0") == "1"
 AI_IMAGE_EXPLANATION = os.getenv("AI_IMAGE_EXPLANATION", "0") == "1"
 
 app = Flask(__name__)
