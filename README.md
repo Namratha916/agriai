@@ -32,6 +32,12 @@ python app.py
 
 Open `http://127.0.0.1:5000`.
 
+For local server-side EasyOCR/Tesseract/TrOCR support, install the optional OCR package set:
+
+```powershell
+pip install -r requirements-local-ocr.txt
+```
+
 ## Ollama Chatbot
 
 AgriAI supports model switching with `MODEL_PROVIDER`.
@@ -98,12 +104,14 @@ If `MODEL_PROVIDER=grok` but `XAI_API_KEY` is missing, the app returns a clear f
 MODEL_PROVIDER=grok
 XAI_API_KEY=your_xai_api_key
 GROK_MODEL=grok-4.3
-HF_LOCAL_ONLY=1
+HF_LOCAL_ONLY=0
 AI_IMAGE_EXPLANATION=0
 AGRIAI_ENABLE_CHROMA=0
 ```
 
 3. Deploy. `vercel.json` routes requests to `app.py`.
+
+The deployed analyzer uses browser OCR first through Tesseract.js, so Vercel does not need heavy local OCR packages like Torch/EasyOCR. If browser OCR cannot read the label, add `HF_API_TOKEN` to Vercel to enable hosted Hugging Face OCR fallback.
 
 ## GitHub Commit Commands
 
@@ -142,14 +150,15 @@ The dedicated speaker button controls voice replies globally:
 
 ## OCR And Hugging Face Photo Analysis
 
-The pesticide photo analyzer is offline-first. Pipeline:
+The pesticide photo analyzer is deployment-first and still supports local OCR. Pipeline:
 
 ```text
 Image upload
--> PIL preprocessing
--> Tesseract OCR
--> EasyOCR fallback
--> Hugging Face TrOCR fallback
+-> browser OCR with Tesseract.js
+-> backend pesticide/active ingredient extraction
+-> if browser OCR is empty: PIL preprocessing
+-> optional Tesseract/EasyOCR/TrOCR local OCR
+-> optional Hugging Face hosted OCR fallback
 -> pesticide/active ingredient extraction
 -> RAG retrieval
 -> structured AI safety explanation
@@ -158,14 +167,12 @@ Image upload
 ```powershell
 $env:HF_OCR_MODEL="microsoft/trocr-base-printed"
 $env:HF_WHISPER_MODEL="openai/whisper-tiny"
-$env:HF_LOCAL_ONLY="1"
+$env:HF_LOCAL_ONLY="0"
 $env:AGRIAI_DEEP_OCR="1"
 python app.py
 ```
 
-Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. The OCR service applies grayscale conversion, contrast enhancement, sharpening, OpenCV resizing, adaptive thresholding, Otsu thresholding, Tesseract OCR, and optional EasyOCR/TrOCR fallback.
-
-Because `HF_LOCAL_ONLY=1`, Hugging Face models must already be cached locally. Set `HF_LOCAL_ONLY=0` only if you want Transformers to download models.
+Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. The OCR service applies grayscale conversion, contrast enhancement, sharpening, OpenCV resizing, adaptive thresholding, Otsu thresholding, Tesseract OCR, and optional EasyOCR/TrOCR fallback when the optional local OCR requirements are installed.
 
 Hosted Hugging Face OCR is also supported:
 
