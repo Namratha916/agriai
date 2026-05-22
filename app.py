@@ -774,7 +774,7 @@ def api_analyze_image():
                 "toxicity_category": "OCR failed",
                 "model": "ocr-unreadable",
             }
-        ), 422
+        )
 
     extracted = KB.identify_from_ocr(ocr_result.text)
     details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"], extracted.get("product_guess", ""))

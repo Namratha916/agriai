@@ -694,6 +694,11 @@ async function analyzeImage() {
   try {
     const response = await fetch("/api/analyze-image", { method: "POST", body: formData });
     const data = await response.json();
+    if (!response.ok && data?.details) {
+      el.imageResult.className = "result-box";
+      el.imageResult.innerHTML = renderImageAnalysis(data);
+      return;
+    }
     if (!response.ok) throw new Error(data.reply || data.error || "Image analysis failed.");
     el.imageResult.className = "result-box";
     el.imageResult.innerHTML = renderImageAnalysis(data);
