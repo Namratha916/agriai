@@ -180,12 +180,32 @@ Large OCR models are disabled by default for Render stability. Keep `AGRIAI_DEEP
 
 ## Render Deployment
 
-Create a Python Web Service on Render with:
+Use the included `render.yaml` blueprint, or create a Python Web Service on Render with:
 
 ```text
+Root directory: leave blank
+Runtime: Python 3
 Build command: pip install -r requirements.txt
-Start command: gunicorn app:app
+Start command: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
 ```
+
+Recommended Render environment variables:
+
+```text
+PYTHON_VERSION=3.12.4
+MODEL_PROVIDER=github
+GITHUB_MODEL=gpt-4o-mini
+HF_LOCAL_ONLY=0
+AGRIAI_DEEP_OCR=0
+AGRIAI_DEEP_OCR_DEFAULT=0
+AGRIAI_ENABLE_TROCR=0
+AGRIAI_ENABLE_CHROMA=0
+AGRIAI_ENABLE_WEB_SEARCH=1
+AI_IMAGE_EXPLANATION=0
+OLLAMA_TIMEOUT=2
+```
+
+Add `GITHUB_TOKEN` only if you want hosted generative replies on Render. Local Ollama will not be available on Render free web services, so the app keeps fast rule/RAG fallback behavior when no hosted model token is configured.
 
 Render also reads `apt.txt` to install lightweight Tesseract language packs for English, Hindi, and Kannada.
 

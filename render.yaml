@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: agriai
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: MODEL_PROVIDER
+        value: github
+      - key: OLLAMA_TIMEOUT
+        value: "2"
+      - key: HF_LOCAL_ONLY
+        value: "0"
+      - key: AGRIAI_DEEP_OCR
+        value: "0"
+      - key: AGRIAI_DEEP_OCR_DEFAULT
+        value: "0"
+      - key: AGRIAI_ENABLE_TROCR
+        value: "0"
+      - key: AGRIAI_ENABLE_CHROMA
+        value: "0"
+      - key: AGRIAI_ENABLE_WEB_SEARCH
+        value: "1"
+      - key: AI_IMAGE_EXPLANATION
+        value: "0"
+      - key: GITHUB_MODEL
+        value: gpt-4o-mini
