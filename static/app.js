@@ -713,7 +713,8 @@ function renderImageAnalysis(data) {
   const details = data.details || {};
   const toxicity = data.toxicity_level || details.harmfulness_level || "Unknown";
   const items = [
-    ["Pesticide/Product", details.pesticide_name],
+    ["Product name from label", details.product_name],
+    ["Detected pesticide/chemical", details.pesticide_name],
     ["Active ingredients", (details.active_ingredients || []).join(", ")],
     ["Usage", details.usage],
     ["Toxicity category", data.toxicity_category || details.toxicity_category],

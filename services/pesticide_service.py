@@ -133,11 +133,16 @@ class PesticideKnowledgeBase:
         if pesticide is None and chemical_hint:
             pesticide = self.find(chemical_hint)
         active_ingredients = extract_active_ingredients(combined)
+        product_guess = guess_product_name(combined)
 
         if pesticide is None and active_ingredients:
             pesticide = self.find(" ".join(active_ingredients))
 
-        product_guess = active_ingredients[0] if active_ingredients else guess_product_name(combined)
+        if pesticide is None and product_guess:
+            pesticide = self.find(product_guess)
+        if pesticide:
+            active_ingredients = prefer_detected_pesticide_name(active_ingredients, pesticide.get("name", ""))
+
         return {
             "pesticide": pesticide,
             "active_ingredients": active_ingredients,
@@ -155,6 +160,7 @@ class PesticideKnowledgeBase:
         )
         if pesticide is None:
             return {
+                "product_name": product_guess or (active_ingredients[0] if active_ingredients else "Not detected from image"),
                 "pesticide_name": active_ingredients[0] if active_ingredients else (product_guess or "Not detected from image"),
                 "active_ingredients": active_ingredients,
                 "usage": usage or "Not detected. Type the product name or active ingredient visible on the label.",
@@ -168,6 +174,7 @@ class PesticideKnowledgeBase:
             }
 
         return {
+            "product_name": product_guess or pesticide.get("name", "Unknown"),
             "pesticide_name": pesticide.get("name", "Unknown"),
             "active_ingredients": active_ingredients or [pesticide.get("name", "Unknown")],
             "usage": usage or f"{pesticide.get('category', 'Pesticide')} use; verify on label.",
@@ -196,7 +203,7 @@ class PesticideKnowledgeBase:
 def extract_active_ingredients(text: str) -> list[str]:
     patterns = [
         r"active\s+ingredient[s]?\s*[:\-]?\s*([a-zA-Z0-9, ./%\-]+)",
-        r"a\.?i\.?\s*[:\-]?\s*([a-zA-Z0-9, ./%\-]+)",
+        r"\ba\.?i\.?\b\s*[:\-]?\s*([a-zA-Z0-9, ./%\-]+)",
         r"contains\s+([a-zA-Z0-9, ./%\-]+)",
     ]
     found: list[str] = []
@@ -205,7 +212,11 @@ def extract_active_ingredients(text: str) -> list[str]:
             cleaned = re.split(r"\n|warning|caution|danger|net|batch|mfg|exp", match, flags=re.IGNORECASE)[0]
             cleaned = cleaned.strip(" :-,.")
             if cleaned and cleaned not in found:
-                found.append(cleaned[:120])
+                for name in split_ingredient_names(cleaned[:120]):
+                    add_unique(found, name)
+    for match in re.findall(r"\b([A-Za-z][A-Za-z\-]{3,})\s+\d+(?:\.\d+)?\s*%?\s*(?:EC|SC|WP|SL|WG|GR|DP|SP|FS)\b", text or "", flags=re.IGNORECASE):
+        clean = clean_candidate_name(match)
+        add_unique(found, clean)
     return found[:5]
 
 
@@ -229,12 +240,74 @@ def infer_usage(explicit_usage: str = "", category: str = "", label_text: str = 
 
 def guess_product_name(text: str) -> str:
     skip = {"danger", "warning", "caution", "poison", "pesticide", "insecticide", "fungicide", "herbicide"}
+    formulation_line = best_formulation_line(text)
+    if formulation_line:
+        return formulation_line
     for line in (text or "").splitlines():
         clean = re.sub(r"[^A-Za-z0-9 %.\-]", " ", line).strip()
         words = [word for word in clean.split() if len(word) >= 4 and normalize(word) not in skip]
         if words:
             return " ".join(words[:4])[:80]
     return ""
+
+
+def split_ingredient_names(value: str) -> list[str]:
+    parts = re.split(r",|/|\+| and |\(|\)|\d+(?:\.\d+)?\s*%| w/?w| w/?v| ec| sc| wp| sl| wg| gr| dp| sp| fs", value, flags=re.IGNORECASE)
+    names = []
+    for part in parts:
+        clean = clean_candidate_name(part)
+        if clean and clean not in names:
+            names.append(clean)
+    return names
+
+
+def clean_candidate_name(value: str) -> str:
+    clean = re.sub(r"[^A-Za-z0-9 .\-]", " ", value or "")
+    clean = re.sub(r"\b(active|ingredient|contains|technical|formulation|insecticide|fungicide|herbicide|pesticide)\b", " ", clean, flags=re.IGNORECASE)
+    clean = " ".join(clean.split()).strip(" .-")
+    if len(clean) < 4:
+        return ""
+    return clean[:80]
+
+
+def best_formulation_line(text: str) -> str:
+    for line in (text or "").splitlines():
+        if re.search(r"\b(active|ingredient|contains|composition)\b", line, flags=re.IGNORECASE):
+            continue
+        clean = re.sub(r"[^A-Za-z0-9 %.\-]", " ", line)
+        clean = " ".join(clean.split()).strip()
+        if re.search(r"\b\d+(?:\.\d+)?\s*%?\s*(EC|SC|WP|SL|WG|GR|DP|SP|FS)\b", clean, flags=re.IGNORECASE):
+            return clean[:90]
+    return ""
+
+
+def add_unique(values: list[str], candidate: str) -> None:
+    if not candidate:
+        return
+    candidate_key = normalize(candidate)
+    if not candidate_key:
+        return
+    if any(normalize(existing) == candidate_key for existing in values):
+        return
+    values.append(candidate)
+
+
+def prefer_detected_pesticide_name(values: list[str], pesticide_name: str) -> list[str]:
+    if not pesticide_name:
+        return values
+    pesticide_key = normalize(pesticide_name)
+    cleaned: list[str] = []
+    matched = False
+    for value in values:
+        value_key = normalize(value)
+        if value_key and (pesticide_key in value_key or value_key in pesticide_key or SequenceMatcher(None, pesticide_key, value_key).ratio() >= 0.82):
+            matched = True
+            add_unique(cleaned, pesticide_name)
+        else:
+            add_unique(cleaned, value)
+    if not cleaned or matched:
+        return cleaned or [pesticide_name]
+    return [pesticide_name, *cleaned]
 
 
 def toxicity_level(pesticide: dict[str, Any] | None, text: str) -> str:
