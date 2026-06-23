@@ -1,1 +1,1 @@
-"""Service modules for AgriAI."""
+"""Service modules for PestiSafe AI."""

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import requests
 
 
-AGRI_PROMPT_TEMPLATE = """You are AgriAI, a pesticide safety Generative AI assistant.
+AGRI_PROMPT_TEMPLATE = """You are PestiSafe AI, a pesticide safety Generative AI assistant.
 Reply in the selected language: {language}.
 Use the given pesticide context.
 If image text is provided, identify pesticide or chemical name.

@@ -1,6 +1,6 @@
-# AgriAI
+# PestiSafe AI
 
-AgriAI is an AI-powered pesticide safety and farmer assistance platform for farmers and pesticide workers who need fast, practical guidance after chemical exposure.
+PestiSafe AI is an AI-powered pesticide safety and farmer assistance platform for farmers and pesticide workers who need fast, practical guidance after chemical exposure.
 
 ## Features
 
@@ -41,7 +41,7 @@ pip install -r requirements-local-ocr.txt
 
 ## Ollama Chatbot
 
-AgriAI supports model switching with `MODEL_PROVIDER`.
+PestiSafe AI supports model switching with `MODEL_PROVIDER`.
 
 Use local Ollama for testing:
 
@@ -70,7 +70,7 @@ python app.py
 Both Grok and Ollama use this prompt format with retrieved pesticide context:
 
 ```text
-You are AgriAI, a pesticide safety Generative AI assistant.
+You are PestiSafe AI, a pesticide safety Generative AI assistant.
 Reply in the selected language: {language}.
 Use the given pesticide context.
 If image text is provided, identify pesticide or chemical name.
@@ -131,7 +131,7 @@ $env:GITHUB_MODEL="gpt-4o-mini"
 python app.py
 ```
 
-AgriAI tries Ollama first, then GitHub Models, then its local pesticide/RAG fallback.
+PestiSafe AI tries Ollama first, then GitHub Models, then its local pesticide/RAG fallback.
 
 ## Language And Voice
 
@@ -146,8 +146,8 @@ Voice input and voice output use the browser Web Speech APIs, so they work best 
 
 The dedicated speaker button controls voice replies globally:
 
-- `Voice ON`: AgriAI speaks chatbot and image-analysis replies.
-- `Voice OFF`: AgriAI immediately calls `window.speechSynthesis.cancel()` and stops any server audio playback.
+- `Voice ON`: PestiSafe AI speaks chatbot and image-analysis replies.
+- `Voice OFF`: PestiSafe AI immediately calls `window.speechSynthesis.cancel()` and stops any server audio playback.
 
 ## OCR And Photo Analysis
 
@@ -191,7 +191,7 @@ Render also reads `apt.txt` to install lightweight Tesseract language packs for 
 
 ## RAG Knowledge Base
 
-AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. By default it uses keyword retrieval plus lightweight hashed embeddings for low-end laptops. Set `AGRIAI_ENABLE_CHROMA=1` to enable ChromaDB + sentence-transformers local vector search on stronger machines.
+PestiSafe AI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. By default it uses keyword retrieval plus lightweight hashed embeddings for low-end laptops. Set `AGRIAI_ENABLE_CHROMA=1` to enable ChromaDB + sentence-transformers local vector search on stronger machines.
 
 If `AGRIAI_ENABLE_WEB_SEARCH=1`, unknown pesticide names and label text can also be searched online and added to the LLM prompt as external context. If internet is unavailable, the app silently falls back to local RAG.
 

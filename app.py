@@ -88,7 +88,7 @@ def build_provider_messages(
         question=user_message,
     )
     return [
-        {"role": "system", "content": "You are AgriAI. Follow the requested pesticide safety answer format and stay medically conservative."},
+        {"role": "system", "content": "You are PestiSafe AI. Follow the requested pesticide safety answer format and stay medically conservative."},
         {"role": "user", "content": prompt},
     ]
 
@@ -202,15 +202,15 @@ def resolve_language(requested_language: str, *texts: str) -> str:
 
 
 KANNADA_UI_REPLIES = {
-    "greeting": "ನಮಸ್ಕಾರ, ನಾನು AgriAI. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ನಿಮಗೆ ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. ನಾನು ಸರಳವಾಗಿ ಮಾರ್ಗದರ್ಶನ ಮಾಡುತ್ತೇನೆ.",
-    "app_help": "AgriAI ಬಳಸಲು: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, ನಂತರ decontamination checklist ಅನುಸರಿಸಿ. ಗಂಭೀರ ಲಕ್ಷಣಗಳಿದ್ದರೆ emergency alert ಮತ್ತು hospital finder ಬಳಸಿ.",
+    "greeting": "ನಮಸ್ಕಾರ, ನಾನು PestiSafe AI. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ನಿಮಗೆ ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. ನಾನು ಸರಳವಾಗಿ ಮಾರ್ಗದರ್ಶನ ಮಾಡುತ್ತೇನೆ.",
+    "app_help": "PestiSafe AI ಬಳಸಲು: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, ನಂತರ decontamination checklist ಅನುಸರಿಸಿ. ಗಂಭೀರ ಲಕ್ಷಣಗಳಿದ್ದರೆ emergency alert ಮತ್ತು hospital finder ಬಳಸಿ.",
     "exposure_question": "ದಯವಿಟ್ಟು label‌ನಲ್ಲಿರುವ ರಾಸಾಯನಿಕದ ಹೆಸರು ಮತ್ತು exposure ಹೇಗೆ ಆಯಿತು ಎಂದು ಹೇಳಿ: ಚರ್ಮ, ಕಣ್ಣು, ಉಸಿರಾಟ ಅಥವಾ ನುಂಗುವಿಕೆ. ತಲೆ ಸುತ್ತುವುದು, ವಾಂತಿ, ಬೆವರು, ಕಣ್ಣು ಉರಿಯುವುದು ಅಥವಾ ಉಸಿರಾಟದ ತೊಂದರೆ ಇದ್ದರೆ ತಿಳಿಸಿ.",
     "general": "ನಾನು pesticide safety, first aid, decontamination, emergency alert, hospital guidance ಮತ್ತು farming help ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡಬಹುದು. ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಬರೆಯಿರಿ.",
 }
 
 HINDI_UI_REPLIES = {
-    "greeting": "नमस्ते, मैं AgriAI हूं। रसायन का नाम, वह कैसे लगा, और कौन से लक्षण हैं, यह बताइए। मैं आपको सरल तरीके से मार्गदर्शन दूंगा।",
-    "app_help": "AgriAI इस्तेमाल करने के लिए: रसायन का नाम डालें, लक्षण चुनें, और decontamination checklist follow करें। गंभीर लक्षण हों तो emergency alert और hospital finder इस्तेमाल करें।",
+    "greeting": "नमस्ते, मैं PestiSafe AI हूं। रसायन का नाम, वह कैसे लगा, और कौन से लक्षण हैं, यह बताइए। मैं आपको सरल तरीके से मार्गदर्शन दूंगा।",
+    "app_help": "PestiSafe AI इस्तेमाल करने के लिए: रसायन का नाम डालें, लक्षण चुनें, और decontamination checklist follow करें। गंभीर लक्षण हों तो emergency alert और hospital finder इस्तेमाल करें।",
     "exposure_question": "कृपया label पर लिखा रसायन नाम और exposure कैसे हुआ बताएं: त्वचा, आंख, सांस या निगलना। चक्कर, उल्टी, पसीना, आंख जलना या सांस की दिक्कत हो तो बताएं।",
     "general": "मैं pesticide safety, first aid, decontamination, emergency alert, hospital guidance और farming help में मदद कर सकता हूं। अपना सवाल लिखिए।",
 }
@@ -221,12 +221,12 @@ def translate_builtin_reply(reply: str, language: str) -> str:
         return reply
 
     translations = {
-        "Hi, I am AgriAI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.": (
-            "ನಮಸ್ಕಾರ, ನಾನು AgriAI. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. "
+        "Hi, I am PestiSafe AI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.": (
+            "ನಮಸ್ಕಾರ, ನಾನು PestiSafe AI. ರಾಸಾಯನಿಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಇರುವ ಲಕ್ಷಣಗಳನ್ನು ಹೇಳಿ. "
             "ಉದಾಹರಣೆ: 'ನಾನು chlorpyrifos ಸಿಂಪಡಿಸಿದೆ ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ.' ನಾನು ಹಂತ ಹಂತವಾಗಿ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ."
         ),
-        "You can use AgriAI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.": (
-            "AgriAI ಅನ್ನು ಮೂರು ಸರಳ ಹಂತಗಳಲ್ಲಿ ಬಳಸಿ: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, "
+        "You can use PestiSafe AI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.": (
+            "PestiSafe AI ಅನ್ನು ಮೂರು ಸರಳ ಹಂತಗಳಲ್ಲಿ ಬಳಸಿ: ರಾಸಾಯನಿಕದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ, ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ, "
             "ಮತ್ತು ಡೀಕಂಟಾಮಿನೇಶನ್ ಚೆಕ್‌ಲಿಸ್ಟ್ ಅನುಸರಿಸಿ. ಲಕ್ಷಣಗಳು ಗಂಭೀರವಾಗಿದ್ದರೆ ಚಾಟ್‌ಬಾಟ್‌ಗಾಗಿ ಕಾಯದೆ emergency alert ಮತ್ತು hospital finder ಬಳಸಿ."
         ),
         "A pesticide is a chemical or natural substance used to control pests such as insects, weeds, fungi, or rodents. Farmers use pesticides to protect crops, but some pesticides can harm people if they touch the skin, get into the eyes, are breathed in, or are swallowed. That is why workers should use protective gear, wash properly after spraying, and get medical help quickly if symptoms appear.": (
@@ -431,7 +431,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
     if intent == "greeting":
         reply = (
             intent,
-            "Hi, I am AgriAI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.",
+            "Hi, I am PestiSafe AI. Tell me the chemical name, how it touched you, and any symptoms. For example: 'I sprayed chlorpyrifos and feel dizzy.' I will guide you step by step.",
         )
         return reply[0], localized_reply(intent, reply[1], language)
 
@@ -447,7 +447,7 @@ def build_base_reply(user_message: str, chemical_name: str = "", symptoms_text: 
     if intent == "app_help":
         reply = (
             intent,
-            "You can use AgriAI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.",
+            "You can use PestiSafe AI in three quick steps: enter the chemical name, select symptoms, and follow the decontamination checklist. If symptoms are serious, use the emergency alert and hospital finder instead of waiting for the chatbot.",
         )
         return reply[0], localized_reply(intent, reply[1], language)
 
@@ -488,9 +488,9 @@ def build_domain_info_reply(user_message: str, language: str = "en") -> str | No
 
     if "safe return" in clean_message or "this project" in clean_message:
         if language == "kn":
-            return "AgriAI ರೈತರು ಮತ್ತು spray workers‌ಗಾಗಿ chemical decontamination alert ಮತ್ತು guide system. ಇದು chemical identify ಮಾಡುವುದು, symptoms check ಮಾಡುವುದು, decontamination steps, emergency alert, nearby medical help ಮತ್ತು chatbot guidance ನೀಡುತ್ತದೆ."
+            return "PestiSafe AI ರೈತರು ಮತ್ತು spray workers‌ಗಾಗಿ chemical decontamination alert ಮತ್ತು guide system. ಇದು chemical identify ಮಾಡುವುದು, symptoms check ಮಾಡುವುದು, decontamination steps, emergency alert, nearby medical help ಮತ್ತು chatbot guidance ನೀಡುತ್ತದೆ."
         return (
-            "AgriAI is a chemical decontamination alert and guide system for farmers and spray workers. "
+            "PestiSafe AI is a chemical decontamination alert and guide system for farmers and spray workers. "
             "It helps users identify a chemical, check symptoms, follow decontamination steps, create an emergency alert, find nearby medical help, and chat with an assistant for guidance."
         )
 
@@ -899,7 +899,7 @@ def api_chat():
     combined_context = "\n\n".join(part for part in [rag_context, f"Internet search context:\n{web_context}" if web_context else ""] if part)
 
     if is_safety_intent:
-        system_prompt = "You are AgriAI. Give short, medically safe pesticide guidance grounded in retrieved context."
+        system_prompt = "You are PestiSafe AI. Give short, medically safe pesticide guidance grounded in retrieved context."
         user_content = SAFETY_RESPONSE_PROMPT.format(
             language=language_name(prompt_language),
             pesticide_name=pesticide_name,
@@ -909,7 +909,7 @@ def api_chat():
             user_message=user_message,
         )
     else:
-        system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
+        system_prompt = "You are PestiSafe AI, a concise farmer assistance chatbot."
         user_content = GENERAL_CHAT_PROMPT.format(
             language=language_name(prompt_language),
             rag_context=combined_context or "No specific pesticide context retrieved.",
@@ -1055,14 +1055,14 @@ def api_chat_stream():
             rag_context=combined_context or safety_reply,
             user_message=user_message,
         )
-        system_prompt = "You are AgriAI. Stream concise, medically safe pesticide guidance."
+        system_prompt = "You are PestiSafe AI. Stream concise, medically safe pesticide guidance."
     else:
         prompt = GENERAL_CHAT_PROMPT.format(
             language=language_name(prompt_language),
             rag_context=combined_context or "No specific pesticide context retrieved.",
             user_message=user_message,
         )
-        system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
+        system_prompt = "You are PestiSafe AI, a concise farmer assistance chatbot."
 
     if SELECTED_LLM.provider == "grok":
         reply, model_name, provider_name = selected_llm_reply(provider_messages, is_safety_intent, safety_reply)
@@ -1138,17 +1138,17 @@ def warm_ocr_model() -> None:
 def _language_pack(language: str) -> dict[str, str]:
     packs = {
         "en": {
-            "greeting": "Hi, I am AgriAI. Tell me the pesticide name, how it touched you, and what you feel now. I will keep it practical.",
+            "greeting": "Hi, I am PestiSafe AI. Tell me the pesticide name, how it touched you, and what you feel now. I will keep it practical.",
             "need_details": "I need one more detail: pesticide name if you know it, exposure type, and symptoms. Example: 'chlorpyrifos spray touched my skin and I feel dizzy'.",
             "emergency": "This can be urgent. If there is breathing trouble, fainting, seizure, confusion, severe vomiting, eye exposure, or swallowing pesticide, call 112 or go to hospital now. Carry the label.",
         },
         "hi": {
-            "greeting": "नमस्ते, मैं AgriAI हूं। कीटनाशक का नाम, संपर्क कैसे हुआ, और अभी क्या महसूस हो रहा है बताइए।",
+            "greeting": "नमस्ते, मैं PestiSafe AI हूं। कीटनाशक का नाम, संपर्क कैसे हुआ, और अभी क्या महसूस हो रहा है बताइए।",
             "need_details": "मुझे एक जानकारी और चाहिए: कीटनाशक का नाम, संपर्क कैसे हुआ, और लक्षण। जैसे: 'chlorpyrifos त्वचा पर लगा और चक्कर आ रहा है'।",
             "emergency": "यह जरूरी हो सकता है। सांस में दिक्कत, बेहोशी, दौरा, भ्रम, तेज उल्टी, आंख में रसायन या निगलने पर 112 कॉल करें या तुरंत अस्पताल जाएं। लेबल साथ ले जाएं।",
         },
         "kn": {
-            "greeting": "ನಮಸ್ಕಾರ, ನಾನು AgriAI. ಕೀಟನಾಶಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಈಗ ನಿಮಗೆ ಏನು ಅನಿಸುತ್ತಿದೆ ಎಂದು ಹೇಳಿ.",
+            "greeting": "ನಮಸ್ಕಾರ, ನಾನು PestiSafe AI. ಕೀಟನಾಶಕದ ಹೆಸರು, ಅದು ಹೇಗೆ ತಗುಲಿತು, ಮತ್ತು ಈಗ ನಿಮಗೆ ಏನು ಅನಿಸುತ್ತಿದೆ ಎಂದು ಹೇಳಿ.",
             "need_details": "ನನಗೆ ಇನ್ನೊಂದು ವಿವರ ಬೇಕು: ಕೀಟನಾಶಕದ ಹೆಸರು, ಸಂಪರ್ಕ ಹೇಗೆ ಆಯಿತು, ಮತ್ತು ಲಕ್ಷಣಗಳು. ಉದಾ: 'chlorpyrifos ಚರ್ಮಕ್ಕೆ ತಗುಲಿತು ಮತ್ತು ತಲೆ ಸುತ್ತುತ್ತಿದೆ'.",
             "emergency": "ಇದು ತುರ್ತು ಆಗಿರಬಹುದು. ಉಸಿರಾಟ ತೊಂದರೆ, ಮೂರ್ಛೆ, ಫಿಟ್ಸ್, ಗೊಂದಲ, ತೀವ್ರ ವಾಂತಿ, ಕಣ್ಣಿಗೆ ರಾಸಾಯನಿಕ ಅಥವಾ ನುಂಗಿದರೆ 112 ಕರೆ ಮಾಡಿ ಅಥವಾ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. ಲೇಬಲ್ ತೆಗೆದುಕೊಂಡು ಹೋಗಿ.",
         },
@@ -1185,10 +1185,10 @@ def build_domain_info_reply(user_message: str, language: str = "en") -> str | No
         return "Organophosphates are insecticides that can affect the nervous system. Exposure may cause headache, vomiting, sweating, salivation, pinpoint pupils, muscle twitching, or breathing trouble. Swallowing or heavy exposure needs urgent hospital care."
     if "safe return" in clean_message or "this project" in clean_message or "agriai" in clean_message:
         if language == "hi":
-            return "AgriAI किसानों और spray workers के लिए pesticide safety assistant है। यह label photo analyze करता है, chemical पहचानता है, symptoms समझता है, RAG से safety जानकारी लाता है, और English/Hindi/Kannada में practical guidance देता है।"
+            return "PestiSafe AI किसानों और spray workers के लिए pesticide safety assistant है। यह label photo analyze करता है, chemical पहचानता है, symptoms समझता है, RAG से safety जानकारी लाता है, और English/Hindi/Kannada में practical guidance देता है।"
         if language == "kn":
-            return "AgriAI ರೈತರು ಮತ್ತು spray workers ಗಾಗಿ pesticide safety assistant. ಇದು label photo ವಿಶ್ಲೇಷಿಸುತ್ತದೆ, chemical ಗುರುತಿಸುತ್ತದೆ, symptoms ಅರ್ಥಮಾಡಿಕೊಳ್ಳುತ್ತದೆ, RAG ಮೂಲಕ safety ಮಾಹಿತಿ ತರುತ್ತದೆ, ಮತ್ತು English/Hindi/Kannada ನಲ್ಲಿ practical guidance ನೀಡುತ್ತದೆ."
-        return "AgriAI is a pesticide safety assistant for farmers and spray workers. It analyzes label photos, identifies chemicals, checks symptoms, retrieves safety knowledge with RAG, and gives practical guidance in English, Hindi, and Kannada."
+            return "PestiSafe AI ರೈತರು ಮತ್ತು spray workers ಗಾಗಿ pesticide safety assistant. ಇದು label photo ವಿಶ್ಲೇಷಿಸುತ್ತದೆ, chemical ಗುರುತಿಸುತ್ತದೆ, symptoms ಅರ್ಥಮಾಡಿಕೊಳ್ಳುತ್ತದೆ, RAG ಮೂಲಕ safety ಮಾಹಿತಿ ತರುತ್ತದೆ, ಮತ್ತು English/Hindi/Kannada ನಲ್ಲಿ practical guidance ನೀಡುತ್ತದೆ."
+        return "PestiSafe AI is a pesticide safety assistant for farmers and spray workers. It analyzes label photos, identifies chemicals, checks symptoms, retrieves safety knowledge with RAG, and gives practical guidance in English, Hindi, and Kannada."
     return None
 
 

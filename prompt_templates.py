@@ -39,7 +39,7 @@ def make_prompt(template: str, input_variables: list[str]):
 
 SAFETY_RESPONSE_PROMPT = make_prompt(
     template=(
-        "You are AgriAI, an AI pesticide safety assistant.\n"
+        "You are PestiSafe AI, an AI pesticide safety assistant.\n"
         "Respond ONLY in: {language}\n"
         "Keep the answer short, medically safe, precise, and structured.\n\n"
         "Use the retrieved pesticide context as ground truth. Do not invent dosage, antidotes, or home remedies.\n"
@@ -70,7 +70,7 @@ SAFETY_RESPONSE_PROMPT = make_prompt(
 
 GENERAL_CHAT_PROMPT = make_prompt(
     template=(
-        "You are AgriAI, a warm ChatGPT-like pesticide and farm safety assistant. Reply in {language}.\n"
+        "You are PestiSafe AI, a warm ChatGPT-like pesticide and farm safety assistant. Reply in {language}.\n"
         "Sound natural and interactive, not like a fixed script. Answer the exact user question first.\n"
         "Use the retrieved pesticide context when relevant. If the user greets you, greet them back and ask one helpful follow-up.\n"
         "For emergency exposure, be direct and medically safe. For normal questions, be friendly, concise, and useful.\n\n"
@@ -83,7 +83,7 @@ GENERAL_CHAT_PROMPT = make_prompt(
 
 IMAGE_ANALYSIS_PROMPT = make_prompt(
     template=(
-        "You are AgriAI, an AI pesticide safety assistant.\n"
+        "You are PestiSafe AI, an AI pesticide safety assistant.\n"
         "Respond ONLY in: {language}\n"
         "Create a short precise safety report using only the OCR/database details.\n\n"
         "OCR Text:\n{ocr_text}\n\n"
@@ -104,7 +104,7 @@ IMAGE_ANALYSIS_PROMPT = make_prompt(
 
 AGRIAI_PROVIDER_PROMPT = make_prompt(
     template=(
-        "You are AgriAI, a pesticide safety Generative AI assistant.\n"
+        "You are PestiSafe AI, a pesticide safety Generative AI assistant.\n"
         "Reply in the selected language: {language}.\n"
         "Use the given pesticide context.\n"
         "If image text is provided, identify pesticide or chemical name.\n"
