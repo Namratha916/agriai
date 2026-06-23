@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-try:
-    from langchain_core.prompts import PromptTemplate
-except Exception:
-    PromptTemplate = None
+import os
+
+PromptTemplate = None
 
 
 LANGUAGE_NAMES = {
@@ -23,6 +22,16 @@ class SimplePromptTemplate:
 
 
 def make_prompt(template: str, input_variables: list[str]):
+    global PromptTemplate
+    if os.getenv("AGRIAI_USE_LANGCHAIN_PROMPTS", "0") != "1":
+        return SimplePromptTemplate(template)
+    if PromptTemplate is None:
+        try:
+            from langchain_core.prompts import PromptTemplate as LangChainPromptTemplate
+
+            PromptTemplate = LangChainPromptTemplate
+        except Exception:
+            return SimplePromptTemplate(template)
     if PromptTemplate is None:
         return SimplePromptTemplate(template)
     return PromptTemplate(input_variables=input_variables, template=template)
