@@ -10,7 +10,6 @@ const el = {
   symptomResult: $("#symptomResult"),
   symptomText: $("#symptomText"),
   locationBtn: $("#locationBtn"),
-  alertBtn: $("#alertBtn"),
   emergencyMessage: $("#emergencyMessage"),
   hospitalLink: $("#hospitalLink"),
   chatLog: $("#chatLog"),
@@ -120,7 +119,6 @@ const STATIC_TEXT = {
     "Symptom Checker": "लक्षण जांच",
     "Select your symptoms to determine if you need immediate medical help.": "तुरंत मेडिकल मदद चाहिए या नहीं, यह जानने के लिए लक्षण चुनें।",
     "Emergency Alert": "आपात मदद",
-    "Generate a quick emergency message with your location and symptoms.": "स्थान और लक्षणों के साथ आपात संदेश बनाएं।",
     "Hospital Finder": "अस्पताल खोजें",
     "Find the nearest hospital or poison control center on the map.": "मैप पर नजदीकी अस्पताल या विष नियंत्रण केंद्र खोजें।",
     "Ask naturally by text or voice. The answer stays focused on what you said.": "टेक्स्ट या आवाज से स्वाभाविक रूप से पूछें। जवाब आपकी बात पर ही केंद्रित रहेगा।",
@@ -132,7 +130,6 @@ const STATIC_TEXT = {
     "Emergency Help": "आपात मदद",
     "Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.": "रसायन, लक्षण और स्थान के साथ आपात मार्गदर्शन बनाएं। तुरंत मदद के लिए कॉल बटन इस्तेमाल करें।",
     "Use location": "स्थान लें",
-    "Create message": "संदेश बनाएं",
     "Call 112": "112 कॉल करें",
     "Call poison helpline": "विष हेल्पलाइन कॉल करें",
     "Nearby Hospital Finder": "नजदीकी अस्पताल खोजें",
@@ -162,7 +159,6 @@ const STATIC_TEXT = {
     "Symptom Checker": "ಲಕ್ಷಣ ಪರಿಶೀಲನೆ",
     "Select your symptoms to determine if you need immediate medical help.": "ತಕ್ಷಣ ವೈದ್ಯಕೀಯ ಸಹಾಯ ಬೇಕೇ ಎಂದು ತಿಳಿಯಲು ಲಕ್ಷಣಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
     "Emergency Alert": "ತುರ್ತು ಸಹಾಯ",
-    "Generate a quick emergency message with your location and symptoms.": "ನಿಮ್ಮ ಸ್ಥಳ ಮತ್ತು ಲಕ್ಷಣಗಳೊಂದಿಗೆ ತುರ್ತು ಸಂದೇಶ ರಚಿಸಿ.",
     "Hospital Finder": "ಆಸ್ಪತ್ರೆ ಹುಡುಕಿ",
     "Find the nearest hospital or poison control center on the map.": "ಮ್ಯಾಪ್‌ನಲ್ಲಿ ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ ಅಥವಾ ವಿಷ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ ಹುಡುಕಿ.",
     "Ask naturally by text or voice. The answer stays focused on what you said.": "ಟೆಕ್ಸ್ಟ್ ಅಥವಾ ಧ್ವನಿಯಿಂದ ಸಹಜವಾಗಿ ಕೇಳಿ. ಉತ್ತರ ನಿಮ್ಮ ಮಾತಿನ ಮೇಲೆಯೇ ಕೇಂದ್ರೀಕರಿಸುತ್ತದೆ.",
@@ -174,7 +170,6 @@ const STATIC_TEXT = {
     "Emergency Help": "ತುರ್ತು ಸಹಾಯ",
     "Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.": "ರಾಸಾಯನಿಕ, ಲಕ್ಷಣಗಳು ಮತ್ತು ಸ್ಥಳದೊಂದಿಗೆ ತುರ್ತು ಮಾರ್ಗದರ್ಶನ ರಚಿಸಿ. ತುರ್ತು ಸಹಾಯಕ್ಕೆ ಕರೆ ಬಟನ್ ಬಳಸಿ.",
     "Use location": "ಸ್ಥಳ ಬಳಸಿ",
-    "Create message": "ಸಂದೇಶ ರಚಿಸಿ",
     "Call 112": "112 ಕರೆ ಮಾಡಿ",
     "Call poison helpline": "ವಿಷ ಸಹಾಯವಾಣಿಗೆ ಕರೆ ಮಾಡಿ",
     "Nearby Hospital Finder": "ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆ ಹುಡುಕಿ",
@@ -208,7 +203,6 @@ function bindEvents() {
   });
   on(el.symptomBtn, "click", analyzeSymptoms);
   on(el.locationBtn, "click", useLocation);
-  on(el.alertBtn, "click", createAlert);
   on(el.chatBtn, "click", sendChat);
   on(el.chatInput, "input", () => updateAutoLanguageFromText(el.chatInput.value));
   on(el.chatInput, "keydown", (event) => {
@@ -373,27 +367,6 @@ function useLocation() {
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
-}
-
-async function createAlert() {
-  if (!el.emergencyMessage) return;
-  const symptoms = selectedSymptoms().join(", ") || el.symptomText?.value || "not provided";
-  try {
-    const response = await fetch("/api/emergency-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chemical: el.chemicalInput?.value || "unknown chemical",
-        symptoms,
-        location: selectedLocation || "location unavailable",
-      }),
-    });
-    const data = await response.json();
-    el.emergencyMessage.value = data.message;
-    if (el.alertBtn) el.alertBtn.textContent = "Message ready";
-  } catch {
-    el.emergencyMessage.value = "Could not create emergency message. Call 112 or 1800-116-117 if symptoms are serious.";
-  }
 }
 
 function addMessage(text, type) {

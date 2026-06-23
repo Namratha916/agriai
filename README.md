@@ -15,9 +15,10 @@ AgriAI is an AI-powered pesticide safety and farmer assistance platform for farm
 - English/Hindi/Kannada language switching with auto language detection.
 - Browser voice input and voice output using Web Speech APIs.
 - Pesticide label photo upload with optional local Hugging Face image-to-text analysis.
-- Multi-engine OCR pipeline: image preprocessing, Tesseract OCR, EasyOCR, and Hugging Face TrOCR fallback.
+- Render-friendly OCR pipeline: browser Tesseract.js, image preprocessing, and lightweight Tesseract OCR when available.
 - Pesticide detail extraction: product name, active ingredients, usage, toxicity level, side effects, first aid, decontamination, and environmental impact.
-- RAG retrieval over `data/pesticides.json` and text manuals in `knowledge/`, with optional ChromaDB + sentence-transformers.
+- RAG retrieval over `data/pesticides.json` and text manuals in `knowledge/`, with lightweight embeddings and optional ChromaDB + sentence-transformers.
+- Optional internet search context for pesticide names that are not in the local database.
 - Optional Whisper speech-to-text and gTTS/Coqui server-side text-to-speech APIs.
 - Optional Streamlit companion UI in `streamlit_app.py`.
 
@@ -148,7 +149,7 @@ The dedicated speaker button controls voice replies globally:
 - `Voice ON`: AgriAI speaks chatbot and image-analysis replies.
 - `Voice OFF`: AgriAI immediately calls `window.speechSynthesis.cancel()` and stops any server audio playback.
 
-## OCR And Hugging Face Photo Analysis
+## OCR And Photo Analysis
 
 The pesticide photo analyzer is deployment-first and still supports local OCR. Pipeline:
 
@@ -157,36 +158,42 @@ Image upload
 -> browser OCR with Tesseract.js
 -> backend pesticide/active ingredient extraction
 -> if browser OCR is empty: PIL preprocessing
--> optional Tesseract/EasyOCR/TrOCR local OCR
--> optional Hugging Face hosted OCR fallback
+-> lightweight Tesseract OCR when available
+-> optional EasyOCR/TrOCR only if explicitly enabled
 -> pesticide/active ingredient extraction
--> RAG retrieval
--> structured AI safety explanation
+-> local RAG + lightweight embeddings + optional internet search context
+-> LLM or fast structured safety explanation
 ```
 
 ```powershell
-$env:HF_OCR_MODEL="microsoft/trocr-base-printed"
 $env:HF_WHISPER_MODEL="openai/whisper-tiny"
 $env:HF_LOCAL_ONLY="0"
-$env:AGRIAI_DEEP_OCR="1"
+$env:AGRIAI_DEEP_OCR="0"
+$env:AGRIAI_ENABLE_TROCR="0"
+$env:AGRIAI_ENABLE_WEB_SEARCH="1"
 python app.py
 ```
 
-Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. The OCR service applies grayscale conversion, contrast enhancement, sharpening, OpenCV resizing, adaptive thresholding, Otsu thresholding, Tesseract OCR, and optional EasyOCR/TrOCR fallback when the optional local OCR requirements are installed.
+Install Tesseract OCR on Windows separately, then make sure `tesseract.exe` is on PATH. The OCR service applies grayscale conversion, contrast enhancement, sharpening, OpenCV resizing, adaptive thresholding, and Otsu thresholding before OCR.
 
-Hosted Hugging Face OCR is also supported:
+Large OCR models are disabled by default for Render stability. Keep `AGRIAI_DEEP_OCR=0` and `AGRIAI_ENABLE_TROCR=0` on small deployments.
 
-```powershell
-$env:HF_API_TOKEN="your_huggingface_token"
-$env:HF_OCR_MODEL="microsoft/trocr-base-printed"
-python app.py
+## Render Deployment
+
+Create a Python Web Service on Render with:
+
+```text
+Build command: pip install -r requirements.txt
+Start command: gunicorn app:app
 ```
 
-If Tesseract/EasyOCR/TrOCR are not installed locally and `HF_API_TOKEN` is not set, AgriAI will still analyze typed label text, filename, and chemical hints, but it cannot reliably read a photo-only label.
+Render also reads `apt.txt` to install lightweight Tesseract language packs for English, Hindi, and Kannada.
 
 ## RAG Knowledge Base
 
-AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. By default it uses a lightweight keyword retriever for low-end laptops. Set `AGRIAI_ENABLE_CHROMA=1` to enable ChromaDB + sentence-transformers local vector search.
+AgriAI always indexes `data/pesticides.json`. You can add pesticide manuals or safety notes as `.txt` files inside `knowledge/`. By default it uses keyword retrieval plus lightweight hashed embeddings for low-end laptops. Set `AGRIAI_ENABLE_CHROMA=1` to enable ChromaDB + sentence-transformers local vector search on stronger machines.
+
+If `AGRIAI_ENABLE_WEB_SEARCH=1`, unknown pesticide names and label text can also be searched online and added to the LLM prompt as external context. If internet is unavailable, the app silently falls back to local RAG.
 
 ## Voice AI
 

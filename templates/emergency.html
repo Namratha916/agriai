@@ -6,16 +6,18 @@
       <span>!</span>
       <div>
         <h2>Emergency Help</h2>
-        <p>Create emergency guidance with chemical, symptoms, and location. Use the call buttons for urgent help.</p>
+        <p>Use these actions for urgent pesticide exposure. This page does not send SMS or WhatsApp messages.</p>
       </div>
     </div>
     <input id="chemicalInput" placeholder="Chemical name if known">
     <textarea id="symptomText" rows="3" placeholder="Symptoms or what happened"></textarea>
     <div class="button-row">
       <button id="locationBtn" type="button">Use location</button>
-      <button id="alertBtn" type="button">Create message</button>
+      <a id="hospitalLink" class="button-link" href="https://www.google.com/maps/search/nearest+hospital" target="_blank" rel="noreferrer">Nearest hospital</a>
     </div>
-    <textarea id="emergencyMessage" rows="5" readonly placeholder="Emergency message will be generated here."></textarea>
+    <div class="result-box muted">
+      If breathing is difficult, pesticide was swallowed, the person is confused, unconscious, having seizures, or vomiting repeatedly, call emergency services now and carry the product label to the hospital.
+    </div>
     <div class="button-row">
       <a class="button-link danger-link" href="tel:112">Call 112</a>
       <a class="button-link secondary" href="tel:1800116117">Call poison helpline</a>

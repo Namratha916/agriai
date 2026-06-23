@@ -1,7 +1,10 @@
 Flask==3.0.3
+gunicorn>=22.0.0
 requests==2.32.3
 python-dotenv>=1.0.0
 Pillow>=10.0.0
+opencv-python-headless>=4.9.0
+pytesseract>=0.3.13
 langchain-core>=0.2.0
 gTTS>=2.5.0
 azure-ai-inference>=1.0.0b1

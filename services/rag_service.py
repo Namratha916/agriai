@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -12,12 +13,17 @@ def tokenize(text: str) -> set[str]:
     return set(re.findall(r"[a-zA-Z0-9]+", (text or "").lower()))
 
 
+def token_list(text: str) -> list[str]:
+    return re.findall(r"[a-zA-Z0-9]+", (text or "").lower())
+
+
 class RAGService:
     def __init__(self, data_path: Path, docs_dir: Path, persist_dir: Path):
         self.data_path = data_path
         self.docs_dir = docs_dir
         self.persist_dir = persist_dir
         self.documents = self._load_seed_documents()
+        self._light_embeddings = [hash_embedding(doc["text"]) for doc in self.documents]
         self._chroma = None
         if os.getenv("AGRIAI_ENABLE_CHROMA", "0") == "1":
             self._init_chroma()
@@ -83,7 +89,17 @@ class RAGService:
             except Exception:
                 pass
 
-        return self._keyword_retrieve(query, top_k)
+        return self._hybrid_retrieve(query, top_k)
+
+    def _hybrid_retrieve(self, query: str, top_k: int) -> list[dict[str, Any]]:
+        keyword_items = self._keyword_retrieve(query, top_k * 2)
+        vector_items = self._embedding_retrieve(query, top_k * 2)
+        merged: dict[str, dict[str, Any]] = {}
+        for item in [*keyword_items, *vector_items]:
+            key = f"{item['source']}::{item['text'][:80]}"
+            if key not in merged or (item.get("score") or 0) > (merged[key].get("score") or 0):
+                merged[key] = item
+        return sorted(merged.values(), key=lambda item: item.get("score") or 0, reverse=True)[:top_k]
 
     def _keyword_retrieve(self, query: str, top_k: int) -> list[dict[str, Any]]:
         query_tokens = tokenize(query)
@@ -100,8 +116,36 @@ class RAGService:
             for score, doc in scored[:top_k]
         ]
 
+    def _embedding_retrieve(self, query: str, top_k: int) -> list[dict[str, Any]]:
+        query_embedding = hash_embedding(query)
+        scored = []
+        for doc, embedding in zip(self.documents, self._light_embeddings):
+            score = cosine_similarity(query_embedding, embedding)
+            if score > 0:
+                scored.append((score, doc))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [
+            {"text": doc["text"], "source": f"light-embedding:{doc['source']}", "score": score}
+            for score, doc in scored[:top_k]
+        ]
+
     def context(self, query: str, top_k: int = 4, max_chars: int = 1800) -> str:
         chunks = []
         for item in self.retrieve(query, top_k):
             chunks.append(f"Source: {item['source']}\n{item['text']}")
         return "\n\n".join(chunks)[:max_chars]
+
+
+def hash_embedding(text: str, dimensions: int = 128) -> list[float]:
+    vector = [0.0] * dimensions
+    for token in token_list(text):
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:4], "big") % dimensions
+        sign = 1.0 if digest[4] % 2 == 0 else -1.0
+        vector[index] += sign
+    norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+    return [value / norm for value in vector]
+
+
+def cosine_similarity(left: list[float], right: list[float]) -> float:
+    return sum(a * b for a, b in zip(left, right))

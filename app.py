@@ -15,6 +15,7 @@ from prompt_templates import AGRIAI_PROVIDER_PROMPT, GENERAL_CHAT_PROMPT, IMAGE_
 from services.ocr_service import OCRResult, OCRService
 from services.ollama_service import OllamaClient
 from services.cloud_chat_service import GitHubModelsClient
+from services.internet_search_service import InternetSearchService
 from services.pesticide_service import PesticideKnowledgeBase
 from services.rag_service import RAGService
 from services.voice_service import speech_to_text, text_to_speech_audio
@@ -40,7 +41,7 @@ KB = PesticideKnowledgeBase(DATA_PATH)
 OCR = OCRService(
     trocr_model=os.getenv("HF_OCR_MODEL", "microsoft/trocr-base-printed"),
     local_only=HF_LOCAL_ONLY,
-    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "1") == "1",
+    enable_deep_ocr=os.getenv("AGRIAI_DEEP_OCR", "0") == "1",
     enable_trocr=os.getenv("AGRIAI_ENABLE_TROCR", "0") == "1",
 )
 RAG = RAGService(DATA_PATH, DOCS_DIR, VECTOR_DIR)
@@ -56,6 +57,7 @@ SELECTED_LLM = AgriAILLM(
     )
 )
 CLOUD_CHAT = GitHubModelsClient()
+WEB_SEARCH = InternetSearchService(timeout=int(os.getenv("AGRIAI_WEB_TIMEOUT", "8")))
 
 
 def load_pesticides() -> list[dict[str, Any]]:
@@ -730,20 +732,6 @@ def api_decontamination():
     return jsonify({"steps": build_decontamination_steps(exposure_type)})
 
 
-@app.post("/api/emergency-message")
-def api_emergency_message():
-    payload = request.get_json(silent=True) or {}
-    chemical = payload.get("chemical") or "unknown chemical"
-    symptoms = payload.get("symptoms") or "not provided"
-    location = payload.get("location") or "location unavailable"
-    message = (
-        "Emergency: possible pesticide/chemical exposure. "
-        f"Chemical: {chemical}. Symptoms: {symptoms}. Location: {location}. "
-        "Please call back immediately and help contact a hospital or poison control."
-    )
-    return jsonify({"message": message})
-
-
 @app.post("/api/analyze-image")
 def api_analyze_image():
     uploaded_file = request.files.get("image")
@@ -782,10 +770,16 @@ def api_analyze_image():
 
     extracted = KB.identify_from_ocr(ocr_result.text)
     details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"], extracted.get("product_guess", ""))
+    web_context = ""
+    if readable_text and not extracted["pesticide"]:
+        web_context = WEB_SEARCH.pesticide_context(readable_text, limit=3)
+    if web_context and details["usage"].startswith("Not detected"):
+        details["usage"] = "Not found in the local database. Web search found pesticide-related references; verify the product label and official safety sheet before use."
     rag_context = RAG.context(f"{details['pesticide_name']} {readable_text}", top_k=3)
-    pesticide_context = json.dumps({**details, "rag_context": rag_context}, ensure_ascii=False, indent=2)
+    combined_context = "\n\n".join(part for part in [rag_context, f"Internet search context:\n{web_context}" if web_context else ""] if part)
+    pesticide_context = json.dumps({**details, "rag_context": combined_context}, ensure_ascii=False, indent=2)
 
-    fallback_reply = format_image_report(details, ocr_result, extracted, language)
+    fallback_reply = format_image_report(details, ocr_result, extracted, language, web_context)
     ai_reply = None
     if AI_IMAGE_EXPLANATION or SELECTED_LLM.provider == "grok":
         provider_messages = build_provider_messages(
@@ -803,10 +797,16 @@ def api_analyze_image():
         {
             "reply": reply,
             "details": details,
+            "extracted": {
+                "product_name": details.get("product_name"),
+                "pesticide_name": details.get("pesticide_name"),
+                "active_ingredients": details.get("active_ingredients", []),
+            },
             "ocr_text": ocr_result.text,
             "analyzed_text": readable_text,
             "ocr_engines": ocr_result.engines_used,
             "ocr_errors": ocr_result.errors[:5],
+            "web_context": web_context,
             "toxicity_level": extracted["toxicity_level"],
             "toxicity_category": extracted["toxicity_category"],
             "model": f"ocr+rag+{SELECTED_LLM.provider}" if ai_reply else "fast-ocr-rag-fallback",
@@ -814,7 +814,8 @@ def api_analyze_image():
     )
 
 
-def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en") -> str:
+def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en", web_context: str = "") -> str:
+    web_note = f"\nInternet search notes: {web_context[:900]}" if web_context else ""
     if language == "kn":
         return (
             f"1. ಪೆಸ್ಟಿಸೈಡ್ ಹೆಸರು: {details['pesticide_name']}\n"
@@ -839,7 +840,7 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
             f"7. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
             f"8. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
             "9. Emergency warning: सांस की दिक्कत, उल्टी, चक्कर, fits, confusion या pesticide निगलने पर तुरंत hospital जाएं. Product label साथ ले जाएं.\n"
-            f"OCR engines: {', '.join(ocr_result.engines_used) or 'OCR engine unavailable'}"
+            f"OCR engines: {', '.join(ocr_result.engines_used) or 'OCR engine unavailable'}{web_note}"
         )
     return (
         f"Pesticide/Product Name: {details['pesticide_name']}\n"
@@ -852,7 +853,7 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
         f"Safety Precautions: {'; '.join(details['safety_precautions'])}\n"
         f"Decontamination Steps: {'; '.join(details['decontamination_steps'])}\n"
         f"Environmental Impact: {details['environmental_impact']}\n"
-        f"OCR Engines Used: {', '.join(ocr_result.engines_used) or 'None available'}"
+        f"OCR Engines Used: {', '.join(ocr_result.engines_used) or 'None available'}{web_note}"
     )
 
 
@@ -891,10 +892,11 @@ def api_chat():
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
     exposure_route = detect_exposure_route(f"{user_message} {symptoms}") or "Unknown"
     rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
-
-    if SELECTED_LLM.provider == "ollama":
-        fallback_reply = safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language)
-        return jsonify({"reply": fallback_reply, "model": "agriai-fast", "provider": "built-in", "rag_context_used": bool(rag_context)})
+    search_terms = normalize(f"{user_message} {chemical_name}")
+    web_context = ""
+    if not pesticide and any(word in search_terms for word in ("pesticide", "insecticide", "fungicide", "herbicide", "chemical", "active ingredient", "label")):
+        web_context = WEB_SEARCH.pesticide_context(f"{chemical_name} {user_message}", limit=3)
+    combined_context = "\n\n".join(part for part in [rag_context, f"Internet search context:\n{web_context}" if web_context else ""] if part)
 
     if is_safety_intent:
         system_prompt = "You are AgriAI. Give short, medically safe pesticide guidance grounded in retrieved context."
@@ -903,14 +905,14 @@ def api_chat():
             pesticide_name=pesticide_name,
             symptoms=symptoms or ", ".join(extract_symptoms(user_message)) or "Not provided",
             exposure_route=exposure_route,
-            rag_context=rag_context or safety_reply,
+            rag_context=combined_context or safety_reply,
             user_message=user_message,
         )
     else:
         system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
         user_content = GENERAL_CHAT_PROMPT.format(
             language=language_name(prompt_language),
-            rag_context=rag_context or "No specific pesticide context retrieved.",
+            rag_context=combined_context or "No specific pesticide context retrieved.",
             user_message=user_message,
         )
 
@@ -926,7 +928,7 @@ def api_chat():
         user_message=user_message,
         chemical_name=chemical_name,
         symptoms=symptoms,
-        rag_context=rag_context,
+        rag_context=combined_context,
         image_text="",
         language=prompt_language,
     )
@@ -940,7 +942,7 @@ def api_chat():
             provider_name = "ollama"
         unsafe_additions = ("eat", "food", "drink water", "induce vomiting", "take medicine")
         if reply and (not is_safety_intent or not any(term in reply.lower() for term in unsafe_additions)):
-            return jsonify({"reply": reply, "model": model_name, "provider": provider_name, "rag_context_used": bool(rag_context)})
+            return jsonify({"reply": reply, "model": model_name, "provider": provider_name, "rag_context_used": bool(combined_context), "web_context_used": bool(web_context)})
     except Exception:
         pass
 
@@ -948,7 +950,7 @@ def api_chat():
         reply = CLOUD_CHAT.chat(messages, safety_mode=is_safety_intent)
         unsafe_additions = ("eat", "food", "drink water", "induce vomiting", "take medicine")
         if reply and (not is_safety_intent or not any(term in reply.lower() for term in unsafe_additions)):
-            return jsonify({"reply": reply, "model": os.getenv("GITHUB_MODEL", "gpt-4o-mini"), "rag_context_used": bool(rag_context)})
+            return jsonify({"reply": reply, "model": os.getenv("GITHUB_MODEL", "gpt-4o-mini"), "rag_context_used": bool(combined_context), "web_context_used": bool(web_context)})
     except Exception:
         pass
 
@@ -957,8 +959,10 @@ def api_chat():
 
     return jsonify(
         {
-            "reply": build_general_fallback_reply(user_message, chemical_name, rag_context, language),
+            "reply": build_general_fallback_reply(user_message, chemical_name, combined_context, language),
             "model": "agriai-context-fallback",
+            "rag_context_used": bool(combined_context),
+            "web_context_used": bool(web_context),
         }
     )
 
@@ -1027,21 +1031,17 @@ def api_chat_stream():
     rag_context = RAG.context(f"{user_message} {chemical_name} {symptoms}", top_k=4)
     pesticide = find_pesticide(chemical_name) or find_pesticide_in_text(user_message) or find_chemical_group(user_message)
     pesticide_name = pesticide.get("name", chemical_name or "Unknown") if pesticide else (chemical_name or "Unknown")
-
-    if SELECTED_LLM.provider == "ollama":
-        fast_reply = safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language)
-
-        def fast_generate():
-            yield f"data: {json.dumps({'token': fast_reply, 'model': 'agriai-fast', 'provider': 'built-in'})}\n\n"
-            yield "data: [DONE]\n\n"
-
-        return Response(fast_generate(), mimetype="text/event-stream")
+    search_terms = normalize(f"{user_message} {chemical_name}")
+    web_context = ""
+    if not pesticide and any(word in search_terms for word in ("pesticide", "insecticide", "fungicide", "herbicide", "chemical", "active ingredient", "label")):
+        web_context = WEB_SEARCH.pesticide_context(f"{chemical_name} {user_message}", limit=3)
+    combined_context = "\n\n".join(part for part in [rag_context, f"Internet search context:\n{web_context}" if web_context else ""] if part)
 
     provider_messages = build_provider_messages(
         user_message=user_message,
         chemical_name=chemical_name,
         symptoms=symptoms,
-        rag_context=rag_context,
+        rag_context=combined_context,
         image_text="",
         language=prompt_language,
     )
@@ -1052,14 +1052,14 @@ def api_chat_stream():
             pesticide_name=pesticide_name,
             symptoms=symptoms or ", ".join(extract_symptoms(user_message)) or "Not provided",
             exposure_route=detect_exposure_route(f"{user_message} {symptoms}") or "Unknown",
-            rag_context=rag_context or safety_reply,
+            rag_context=combined_context or safety_reply,
             user_message=user_message,
         )
         system_prompt = "You are AgriAI. Stream concise, medically safe pesticide guidance."
     else:
         prompt = GENERAL_CHAT_PROMPT.format(
             language=language_name(prompt_language),
-            rag_context=rag_context or "No specific pesticide context retrieved.",
+            rag_context=combined_context or "No specific pesticide context retrieved.",
             user_message=user_message,
         )
         system_prompt = "You are AgriAI, a concise farmer assistance chatbot."
@@ -1109,7 +1109,7 @@ def api_chat_stream():
                 )
             except Exception:
                 cloud_reply = None
-            fallback = cloud_reply or (safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, rag_context, language))
+            fallback = cloud_reply or (safety_reply if is_safety_intent else build_general_fallback_reply(user_message, chemical_name, combined_context, language))
             yield f"data: {json.dumps({'token': fallback})}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -1270,26 +1270,19 @@ def build_general_fallback_reply(user_message: str, chemical_name: str, rag_cont
     return reply
 
 
-def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en") -> str:
+def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en", web_context: str = "") -> str:
     name = details.get("pesticide_name", "Not detected from image")
     active = ", ".join(details.get("active_ingredients", [])) or "Unknown"
     danger = extracted.get("toxicity_level") or details.get("harmfulness_level", "Unknown")
     category = extracted.get("toxicity_category") or details.get("toxicity_category", "Unknown")
     side_effects = ", ".join(details.get("side_effects", [])) or "Unknown"
     note = "" if ocr_result.text else "\nNote: OCR could not read the image clearly. Type the visible label text or pesticide name for better accuracy."
+    if web_context:
+        note += f"\nInternet search notes: {web_context[:900]}"
     first_aid = details.get("first_aid") or "Move away from exposure, remove contaminated clothing, wash exposed skin, and contact a doctor if symptoms appear."
     precautions = "; ".join(details.get("safety_precautions", [])) or "Wear gloves, mask, goggles, long sleeves, and avoid inhaling spray mist."
     decontamination = "; ".join(details.get("decontamination_steps", [])) or "Wash exposed skin with soap and running water."
     hospital = "Visit hospital urgently for breathing trouble, fainting, severe vomiting, eye exposure, confusion, fits, or if pesticide was swallowed."
-    return (
-        f"1. Identified pesticide/chemical: {name} (active ingredient: {active})\n"
-        f"2. Danger level: {danger}; category: {category}\n"
-        f"3. Side effects: {side_effects}\n"
-        f"4. First aid: {first_aid}\n"
-        f"5. Safety precautions: {precautions} Decontamination: {decontamination}\n"
-        f"6. When to visit hospital: {hospital}"
-        f"{note}"
-    )
     if language == "hi":
         return (
             f"1. कीटनाशक पहचान: {name}\n2. सक्रिय घटक: {active}\n3. खतरा स्तर: {danger}\n"
