@@ -660,7 +660,7 @@ def symptoms_page():
 
 @app.get("/emergency")
 def emergency_page():
-    return render_template("emergency.html")
+    return redirect(url_for("hospital_page"))
 
 
 @app.get("/hospital")
@@ -757,7 +757,7 @@ def api_analyze_image():
                     "OCR could not read text from this image. Please retake the photo closer to the pesticide label, "
                     "keep the product name and active ingredient in focus, and avoid glare."
                 ),
-                "details": KB.structured_details(None, []),
+                "details": KB.structured_details(None, [], label_text=client_ocr_text),
                 "ocr_text": "",
                 "analyzed_text": "",
                 "ocr_engines": ocr_result.engines_used,
@@ -769,7 +769,12 @@ def api_analyze_image():
         )
 
     extracted = KB.identify_from_ocr(ocr_result.text)
-    details = KB.structured_details(extracted["pesticide"], extracted["active_ingredients"], extracted.get("product_guess", ""))
+    details = KB.structured_details(
+        extracted["pesticide"],
+        extracted["active_ingredients"],
+        extracted.get("product_guess", ""),
+        readable_text,
+    )
     web_context = ""
     if readable_text and not extracted["pesticide"]:
         web_context = WEB_SEARCH.pesticide_context(readable_text, limit=3)

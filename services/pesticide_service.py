@@ -147,12 +147,17 @@ class PesticideKnowledgeBase:
             "matched_text": combined[:4000],
         }
 
-    def structured_details(self, pesticide: dict[str, Any] | None, active_ingredients: list[str], product_guess: str = "") -> dict[str, Any]:
+    def structured_details(self, pesticide: dict[str, Any] | None, active_ingredients: list[str], product_guess: str = "", label_text: str = "") -> dict[str, Any]:
+        usage = infer_usage(
+            pesticide.get("usage") if pesticide else "",
+            pesticide.get("category") if pesticide else "",
+            " ".join([product_guess or "", label_text or "", " ".join(active_ingredients or [])]),
+        )
         if pesticide is None:
             return {
                 "pesticide_name": active_ingredients[0] if active_ingredients else (product_guess or "Not detected from image"),
                 "active_ingredients": active_ingredients,
-                "usage": "Not detected. Type the product name or active ingredient visible on the label.",
+                "usage": usage or "Not detected. Type the product name or active ingredient visible on the label.",
                 "harmfulness_level": "Needs label text",
                 "toxicity_category": "Needs OCR/manual label text",
                 "side_effects": ["Cannot identify exact side effects until pesticide name or active ingredient is readable."],
@@ -165,7 +170,7 @@ class PesticideKnowledgeBase:
         return {
             "pesticide_name": pesticide.get("name", "Unknown"),
             "active_ingredients": active_ingredients or [pesticide.get("name", "Unknown")],
-            "usage": pesticide.get("usage", f"{pesticide.get('category', 'Pesticide')} use; verify on label."),
+            "usage": usage or f"{pesticide.get('category', 'Pesticide')} use; verify on label.",
             "harmfulness_level": pesticide.get("danger_level", "Unknown"),
             "toxicity_category": pesticide.get("toxicity_category", pesticide.get("category", "Unknown")),
             "side_effects": pesticide.get("symptoms", []),
@@ -202,6 +207,24 @@ def extract_active_ingredients(text: str) -> list[str]:
             if cleaned and cleaned not in found:
                 found.append(cleaned[:120])
     return found[:5]
+
+
+def infer_usage(explicit_usage: str = "", category: str = "", label_text: str = "") -> str:
+    if explicit_usage:
+        return explicit_usage
+
+    clean = normalize(f"{category} {label_text}")
+    if "insecticide" in clean or "pyrethroid" in clean or "organophosphate" in clean or "carbamate" in clean:
+        return "Used to control insect pests on crops. Follow the crop, dose, and waiting-period directions on the product label."
+    if "fungicide" in clean or "mancozeb" in clean or "carbendazim" in clean:
+        return "Used to control fungal diseases on crops. Follow the crop and disease directions on the product label."
+    if "herbicide" in clean or "glyphosate" in clean or "weed" in clean:
+        return "Used to control weeds. Avoid drift onto crops, people, animals, and water."
+    if "rodenticide" in clean or "rat" in clean or "rodent" in clean:
+        return "Used to control rodents. Keep away from children, animals, food, and water sources."
+    if "pesticide" in clean:
+        return "Used for pest control. Confirm the exact pest/crop instructions on the product label."
+    return ""
 
 
 def guess_product_name(text: str) -> str:
