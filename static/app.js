@@ -111,7 +111,7 @@ const STATIC_TEXT = {
     "PestiSafe AI Chatbot": "PestiSafe AI सहायक",
     "Ask questions and get instant AI guidance on pesticide exposure and safety.": "कीटनाशक संपर्क और सुरक्षा पर सवाल पूछें और तुरंत AI मार्गदर्शन पाएं।",
     "Chemical Identifier": "रसायन पहचान",
-    "Enter a chemical name to quickly check its danger level and first aid steps.": "खतरा स्तर और प्राथमिक उपचार देखने के लिए रसायन का नाम डालें।",
+    "Enter a chemical name to quickly check symptoms, precautions, and first aid steps.": "लक्षण, सावधानियां और प्राथमिक उपचार देखने के लिए रसायन का नाम डालें।",
     "Photo Analyzer": "फोटो विश्लेषक",
     "Upload a photo of a pesticide label to extract safety warnings and details.": "सुरक्षा चेतावनी और जानकारी निकालने के लिए कीटनाशक लेबल की फोटो अपलोड करें।",
     "Decontamination": "डी-कंटैमिनेशन",
@@ -151,7 +151,7 @@ const STATIC_TEXT = {
     "PestiSafe AI Chatbot": "PestiSafe AI ಸಹಾಯಕ",
     "Ask questions and get instant AI guidance on pesticide exposure and safety.": "ಕೀಟನಾಶಕ ಸಂಪರ್ಕ ಮತ್ತು ಸುರಕ್ಷತೆ ಬಗ್ಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿ, ತಕ್ಷಣ AI ಮಾರ್ಗದರ್ಶನ ಪಡೆಯಿರಿ.",
     "Chemical Identifier": "ರಾಸಾಯನಿಕ ಗುರುತು",
-    "Enter a chemical name to quickly check its danger level and first aid steps.": "ಅಪಾಯ ಮಟ್ಟ ಮತ್ತು ಮೊದಲ ನೆರವು ನೋಡಲು ರಾಸಾಯನಿಕದ ಹೆಸರು ನಮೂದಿಸಿ.",
+    "Enter a chemical name to quickly check symptoms, precautions, and first aid steps.": "ಲಕ್ಷಣಗಳು, ಮುನ್ನೆಚ್ಚರಿಕೆಗಳು ಮತ್ತು ಮೊದಲ ನೆರವು ನೋಡಲು ರಾಸಾಯನಿಕದ ಹೆಸರು ನಮೂದಿಸಿ.",
     "Photo Analyzer": "ಫೋಟೋ ವಿಶ್ಲೇಷಕ",
     "Upload a photo of a pesticide label to extract safety warnings and details.": "ಸುರಕ್ಷತಾ ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ವಿವರಗಳನ್ನು ಪಡೆಯಲು ಕೀಟನಾಶಕ ಲೇಬಲ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ.",
     "Decontamination": "ಡೀಕಂಟಾಮಿನೇಶನ್",
@@ -307,7 +307,6 @@ async function lookupChemical() {
     el.chemicalResult.innerHTML = `
       <strong>${escapeHtml(chemical.name)}</strong>
       <div>Category: ${escapeHtml(chemical.category || "Unknown")}</div>
-      <div>Danger level: <span class="${dangerClass(chemical.danger_level)}">${escapeHtml(chemical.danger_level || "Unknown")}</span></div>
       <div>Common symptoms: ${escapeHtml((chemical.symptoms || []).join(", ") || "Unknown")}</div>
       <div>First aid: ${escapeHtml(chemical.first_aid || "Seek medical advice if symptoms appear.")}</div>
     `;
@@ -339,7 +338,7 @@ async function analyzeSymptoms() {
     const data = await response.json();
     el.symptomResult.className = "result-box";
     el.symptomResult.innerHTML = `
-      <strong class="${dangerClass(data.level)}">${escapeHtml(data.level)}</strong>
+      <strong>Safety guidance</strong>
       <div>${escapeHtml(data.action)}</div>
       <div class="muted">Matched symptoms: ${escapeHtml((data.matched_symptoms || []).join(", ") || "none from high-risk list")}</div>
     `;
@@ -711,13 +710,11 @@ function lockImageStatus(message) {
 function renderImageAnalysis(data) {
   const text = UI_TEXT[uiLanguage()] || UI_TEXT.en;
   const details = data.details || {};
-  const toxicity = data.toxicity_level || details.harmfulness_level || "Unknown";
   const items = [
     ["Product name from label", details.product_name],
     ["Detected pesticide/chemical", details.pesticide_name],
     ["Active ingredients", (details.active_ingredients || []).join(", ")],
     ["Usage", details.usage],
-    ["Toxicity category", data.toxicity_category || details.toxicity_category],
     ["First aid", details.first_aid],
     ["Side effects", (details.side_effects || []).join(", ")],
     ["Safety precautions", (details.safety_precautions || []).join("; ")],
@@ -727,7 +724,6 @@ function renderImageAnalysis(data) {
   return `
     <div class="analysis-header">
       <strong>${escapeHtml(text.imageAnalysis)}</strong>
-      <span class="toxicity-badge ${dangerClass(toxicity)}">${escapeHtml(toxicity)}</span>
     </div>
     <pre>${escapeHtml(data.reply || "")}</pre>
     <div class="analysis-list">

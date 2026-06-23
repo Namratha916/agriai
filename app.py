@@ -255,7 +255,6 @@ def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text:
     exposure = detect_exposure_route(f"{user_message} {symptoms_text}")
 
     if language == "kn":
-        danger = pesticide.get("danger_level", "ಗೊತ್ತಿಲ್ಲ") if pesticide else "ಗೊತ್ತಿಲ್ಲ"
         symptom_text = ", ".join(symptoms) if symptoms else "ಲಕ್ಷಣಗಳನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ನೀಡಿಲ್ಲ"
         if exposure == "ingestion":
             first = f"{name} ನುಂಗಿರುವುದು ತುರ್ತು ಪರಿಸ್ಥಿತಿ. ವಾಂತಿ ಮಾಡಿಸಲು ಪ್ರಯತ್ನಿಸಬೇಡಿ, ಏನನ್ನೂ ತಿನ್ನಬೇಡಿ ಅಥವಾ ಕುಡಿಯಬೇಡಿ, ವೈದ್ಯರು ಅಥವಾ poison control ಹೇಳಿದರೆ ಮಾತ್ರ ಮಾಡಿ."
@@ -263,14 +262,12 @@ def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text:
             first = f"{name} exposure ಆಗಿರಬಹುದು. ಕೆಲಸ ನಿಲ್ಲಿಸಿ, spray area ಇಂದ ದೂರ ಹೋಗಿ, fresh air ಇರುವ ಸ್ಥಳದಲ್ಲಿ ಇರಿರಿ."
         return (
             f"{first}\n"
-            f"ಅಪಾಯ ಮಟ್ಟ: {danger}.\n"
             f"ಲಕ್ಷಣಗಳು: {symptom_text}.\n"
             "ತಕ್ಷಣದ ಕ್ರಮ: contaminated ಬಟ್ಟೆ, shoes ಮತ್ತು gloves ತೆಗೆದು ಬೇರೆ ಇಡಿ. ಚರ್ಮ ಮತ್ತು ಕೂದಲನ್ನು soap ಮತ್ತು running water ಬಳಸಿ ಚೆನ್ನಾಗಿ ತೊಳೆಯಿರಿ. ಕಣ್ಣಿಗೆ ಹೋದರೆ 15 ನಿಮಿಷ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ.\n"
             "ವೈದ್ಯಕೀಯ ಸಲಹೆ: ಉಸಿರಾಟದ ತೊಂದರೆ, ವಾಂತಿ, ತಲೆ ಸುತ್ತುವುದು, ಗೊಂದಲ, fits ಅಥವಾ ಹೆಚ್ಚು exposure ಇದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. Product label ಅಥವಾ bottle ತೆಗೆದುಕೊಂಡು ಹೋಗಿ. ಭಾರತದಲ್ಲಿ 1800-116-117 ಕರೆ ಮಾಡಬಹುದು."
         )
 
     if language == "hi":
-        danger = pesticide.get("danger_level", "Unknown") if pesticide else "Unknown"
         symptom_text = ", ".join(symptoms) if symptoms else "लक्षण स्पष्ट नहीं दिए गए"
         if exposure == "ingestion":
             first = f"{name} निगलना emergency हो सकता है। उल्टी कराने की कोशिश न करें, कुछ खाएं या पिएं नहीं, जब तक doctor या poison control न कहे।"
@@ -278,7 +275,6 @@ def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text:
             first = f"{name} exposure हो सकता है। काम रोकें, spray area से दूर जाएं, और fresh air में रहें।"
         return (
             f"{first}\n"
-            f"खतरे का स्तर: {danger}.\n"
             f"लक्षण: {symptom_text}.\n"
             "तुरंत कदम: contaminated कपड़े, shoes और gloves हटाकर अलग रखें। त्वचा और बाल soap और running water से धोएं। आंख में गया हो तो 15 मिनट पानी से धोएं.\n"
             "Medical help: सांस की दिक्कत, उल्टी, चक्कर, confusion, fits या heavy exposure हो तो तुरंत hospital जाएं। Product label या bottle साथ ले जाएं। भारत में 1800-116-117 call करें."
@@ -825,34 +821,28 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
         return (
             f"1. ಪೆಸ್ಟಿಸೈಡ್ ಹೆಸರು: {details['pesticide_name']}\n"
             f"2. Active ingredients: {', '.join(details['active_ingredients']) or 'label text ಬೇಕು'}\n"
-            f"3. Toxicity level: {extracted['toxicity_level']}\n"
-            f"4. Danger category: {extracted['toxicity_category']}\n"
-            f"5. Side effects: {', '.join(details['side_effects']) or 'ಪೆಸ್ಟಿಸೈಡ್ ಹೆಸರು ಸ್ಪಷ್ಟವಾದ ನಂತರ ಮಾತ್ರ ಖಚಿತವಾಗಿ ಹೇಳಬಹುದು'}\n"
-            f"6. First aid: {details['first_aid']}\n"
-            f"7. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
-            f"8. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
-            "9. Emergency warning: ಉಸಿರಾಟದ ತೊಂದರೆ, ವಾಂತಿ, ತಲೆ ಸುತ್ತುವುದು, fits, confusion ಅಥವಾ pesticide ನುಂಗಿದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. Product label ತೆಗೆದುಕೊಂಡು ಹೋಗಿ.\n"
+            f"3. Side effects: {', '.join(details['side_effects']) or 'ಪೆಸ್ಟಿಸೈಡ್ ಹೆಸರು ಸ್ಪಷ್ಟವಾದ ನಂತರ ಮಾತ್ರ ಖಚಿತವಾಗಿ ಹೇಳಬಹುದು'}\n"
+            f"4. First aid: {details['first_aid']}\n"
+            f"5. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
+            f"6. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
+            "7. Emergency warning: ಉಸಿರಾಟದ ತೊಂದರೆ, ವಾಂತಿ, ತಲೆ ಸುತ್ತುವುದು, fits, confusion ಅಥವಾ pesticide ನುಂಗಿದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. Product label ತೆಗೆದುಕೊಂಡು ಹೋಗಿ.\n"
             f"OCR engines: {', '.join(ocr_result.engines_used) or 'OCR engine ಲಭ್ಯವಿಲ್ಲ'}"
         )
     if language == "hi":
         return (
             f"1. Pesticide नाम: {details['pesticide_name']}\n"
             f"2. Active ingredients: {', '.join(details['active_ingredients']) or 'label text चाहिए'}\n"
-            f"3. Toxicity level: {extracted['toxicity_level']}\n"
-            f"4. Danger category: {extracted['toxicity_category']}\n"
-            f"5. Side effects: {', '.join(details['side_effects']) or 'pesticide name साफ होने के बाद ही बताया जा सकता है'}\n"
-            f"6. First aid: {details['first_aid']}\n"
-            f"7. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
-            f"8. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
-            "9. Emergency warning: सांस की दिक्कत, उल्टी, चक्कर, fits, confusion या pesticide निगलने पर तुरंत hospital जाएं. Product label साथ ले जाएं.\n"
+            f"3. Side effects: {', '.join(details['side_effects']) or 'pesticide name साफ होने के बाद ही बताया जा सकता है'}\n"
+            f"4. First aid: {details['first_aid']}\n"
+            f"5. Safety precautions: {'; '.join(details['safety_precautions'])}\n"
+            f"6. Decontamination: {'; '.join(details['decontamination_steps'])}\n"
+            "7. Emergency warning: सांस की दिक्कत, उल्टी, चक्कर, fits, confusion या pesticide निगलने पर तुरंत hospital जाएं. Product label साथ ले जाएं.\n"
             f"OCR engines: {', '.join(ocr_result.engines_used) or 'OCR engine unavailable'}{web_note}"
         )
     return (
         f"Pesticide/Product Name: {details['pesticide_name']}\n"
         f"Active Ingredients: {', '.join(details['active_ingredients']) or 'Unknown'}\n"
         f"Usage: {details['usage']}\n"
-        f"Harmfulness Level: {extracted['toxicity_level']}\n"
-        f"Toxicity Category: {extracted['toxicity_category']}\n"
         f"Side Effects: {', '.join(details['side_effects']) or 'Unknown'}\n"
         f"First Aid: {details['first_aid']}\n"
         f"Safety Precautions: {'; '.join(details['safety_precautions'])}\n"
@@ -1214,28 +1204,25 @@ def localized_safety_reply(user_message: str, chemical_name: str, symptoms_text:
     pesticide = find_pesticide(chemical_name) if chemical_name else None
     pesticide = pesticide or find_pesticide_in_text(user_message) or find_chemical_group(f"{user_message} {chemical_name}")
     name = pesticide.get("name", chemical_name or "Unknown pesticide") if pesticide else (chemical_name or "Unknown pesticide")
-    danger = pesticide.get("danger_level", "Unknown") if pesticide else "Unknown"
     symptoms = ", ".join(extract_symptoms(f"{user_message} {symptoms_text}")) or "not clearly provided"
     route = detect_exposure_route(f"{user_message} {symptoms_text}") or "unknown"
     if language == "hi":
         return (
             f"1. कीटनाशक: {name}\n"
-            f"2. खतरा स्तर: {danger}\n"
-            f"3. लक्षण: {symptoms}\n"
-            f"4. संपर्क: {route}\n"
-            "5. अभी करें: स्प्रे क्षेत्र से दूर जाएं, ताजी हवा में रहें, दूषित कपड़े अलग करें।\n"
-            "6. सफाई: त्वचा और बालों को साबुन और बहते पानी से धोएं। आंख में गया हो तो 15 मिनट पानी से धोएं।\n"
-            "7. डॉक्टर: लक्षण बढ़ें, उल्टी/चक्कर/सांस की दिक्कत हो, या निगला हो तो तुरंत अस्पताल जाएं।"
+            f"2. लक्षण: {symptoms}\n"
+            f"3. संपर्क: {route}\n"
+            "4. अभी करें: स्प्रे क्षेत्र से दूर जाएं, ताजी हवा में रहें, दूषित कपड़े अलग करें।\n"
+            "5. सफाई: त्वचा और बालों को साबुन और बहते पानी से धोएं। आंख में गया हो तो 15 मिनट पानी से धोएं।\n"
+            "6. डॉक्टर: लक्षण बढ़ें, उल्टी/चक्कर/सांस की दिक्कत हो, या निगला हो तो तुरंत अस्पताल जाएं।"
         )
     if language == "kn":
         return (
             f"1. ಕೀಟನಾಶಕ: {name}\n"
-            f"2. ಅಪಾಯ ಮಟ್ಟ: {danger}\n"
-            f"3. ಲಕ್ಷಣಗಳು: {symptoms}\n"
-            f"4. ಸಂಪರ್ಕ: {route}\n"
-            "5. ಈಗ ಮಾಡಿ: ಸ್ಪ್ರೇ ಪ್ರದೇಶದಿಂದ ದೂರ ಹೋಗಿ, ತಾಜಾ ಗಾಳಿಯಲ್ಲಿ ಇರಿ, ಕಲುಷಿತ ಬಟ್ಟೆಗಳನ್ನು ಬೇರ್ಪಡಿಸಿ.\n"
-            "6. ಸ್ವಚ್ಛತೆ: ಚರ್ಮ ಮತ್ತು ಕೂದಲನ್ನು ಸಾಬೂನು ಮತ್ತು ಹರಿಯುವ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ. ಕಣ್ಣಿಗೆ ಹೋದರೆ 15 ನಿಮಿಷ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ.\n"
-            "7. ವೈದ್ಯರು: ಲಕ್ಷಣಗಳು ಹೆಚ್ಚಾದರೆ, ವಾಂತಿ/ತಲೆಸುತ್ತು/ಉಸಿರಾಟ ತೊಂದರೆ ಇದ್ದರೆ, ಅಥವಾ ನುಂಗಿದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
+            f"2. ಲಕ್ಷಣಗಳು: {symptoms}\n"
+            f"3. ಸಂಪರ್ಕ: {route}\n"
+            "4. ಈಗ ಮಾಡಿ: ಸ್ಪ್ರೇ ಪ್ರದೇಶದಿಂದ ದೂರ ಹೋಗಿ, ತಾಜಾ ಗಾಳಿಯಲ್ಲಿ ಇರಿ, ಕಲುಷಿತ ಬಟ್ಟೆಗಳನ್ನು ಬೇರ್ಪಡಿಸಿ.\n"
+            "5. ಸ್ವಚ್ಛತೆ: ಚರ್ಮ ಮತ್ತು ಕೂದಲನ್ನು ಸಾಬೂನು ಮತ್ತು ಹರಿಯುವ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ. ಕಣ್ಣಿಗೆ ಹೋದರೆ 15 ನಿಮಿಷ ನೀರಿನಿಂದ ತೊಳೆಯಿರಿ.\n"
+            "6. ವೈದ್ಯರು: ಲಕ್ಷಣಗಳು ಹೆಚ್ಚಾದರೆ, ವಾಂತಿ/ತಲೆಸುತ್ತು/ಉಸಿರಾಟ ತೊಂದರೆ ಇದ್ದರೆ, ಅಥವಾ ನುಂಗಿದ್ದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
         )
     return None
 
@@ -1246,7 +1233,6 @@ def build_general_fallback_reply(user_message: str, chemical_name: str, rag_cont
         details = KB.structured_details(pesticide, [])
         reply = (
             f"{pesticide.get('name')} is a {pesticide.get('category', 'pesticide')}. "
-            f"Danger level: {pesticide.get('danger_level', 'Unknown')}. "
             f"Possible symptoms include {', '.join(pesticide.get('symptoms', [])) or 'irritation or poisoning symptoms'}. "
             f"First aid: {pesticide.get('first_aid', 'Stop exposure, wash exposed areas, and seek medical advice if symptoms appear.')} "
             f"Precautions: {'; '.join(details.get('safety_precautions', []))}"
@@ -1278,8 +1264,6 @@ def build_general_fallback_reply(user_message: str, chemical_name: str, rag_cont
 def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str, Any], language: str = "en", web_context: str = "") -> str:
     name = details.get("pesticide_name", "Not detected from image")
     active = ", ".join(details.get("active_ingredients", [])) or "Unknown"
-    danger = extracted.get("toxicity_level") or details.get("harmfulness_level", "Unknown")
-    category = extracted.get("toxicity_category") or details.get("toxicity_category", "Unknown")
     side_effects = ", ".join(details.get("side_effects", [])) or "Unknown"
     note = "" if ocr_result.text else "\nNote: OCR could not read the image clearly. Type the visible label text or pesticide name for better accuracy."
     if web_context:
@@ -1290,31 +1274,29 @@ def format_image_report(details: dict[str, Any], ocr_result, extracted: dict[str
     hospital = "Visit hospital urgently for breathing trouble, fainting, severe vomiting, eye exposure, confusion, fits, or if pesticide was swallowed."
     if language == "hi":
         return (
-            f"1. कीटनाशक पहचान: {name}\n2. सक्रिय घटक: {active}\n3. खतरा स्तर: {danger}\n"
-            f"4. विष श्रेणी: {category}\n5. दुष्प्रभाव: {side_effects}\n6. प्राथमिक उपचार: {details.get('first_aid')}\n"
-            f"7. सुरक्षा: {'; '.join(details.get('safety_precautions', []))}\n8. सफाई: {'; '.join(details.get('decontamination_steps', []))}\n"
-            "9. आपात सलाह: सांस की दिक्कत, बेहोशी, तेज उल्टी, आंख में रसायन या निगलने पर तुरंत अस्पताल जाएं."
+            f"1. कीटनाशक पहचान: {name}\n2. सक्रिय घटक: {active}\n3. दुष्प्रभाव: {side_effects}\n"
+            f"4. प्राथमिक उपचार: {details.get('first_aid')}\n"
+            f"5. सुरक्षा: {'; '.join(details.get('safety_precautions', []))}\n6. सफाई: {'; '.join(details.get('decontamination_steps', []))}\n"
+            "7. आपात सलाह: सांस की दिक्कत, बेहोशी, तेज उल्टी, आंख में रसायन या निगलने पर तुरंत अस्पताल जाएं."
             f"{note}"
         )
     if language == "kn":
         return (
-            f"1. ಕೀಟನಾಶಕ ಗುರುತು: {name}\n2. ಸಕ್ರಿಯ ಪದಾರ್ಥಗಳು: {active}\n3. ಅಪಾಯ ಮಟ್ಟ: {danger}\n"
-            f"4. ವಿಷ ವರ್ಗ: {category}\n5. ದುಷ್ಪರಿಣಾಮಗಳು: {side_effects}\n6. ಮೊದಲ ನೆರವು: {details.get('first_aid')}\n"
-            f"7. ಸುರಕ್ಷತೆ: {'; '.join(details.get('safety_precautions', []))}\n8. ಸ್ವಚ್ಛತೆ: {'; '.join(details.get('decontamination_steps', []))}\n"
-            "9. ತುರ್ತು ಸಲಹೆ: ಉಸಿರಾಟ ತೊಂದರೆ, ಮೂರ್ಛೆ, ತೀವ್ರ ವಾಂತಿ, ಕಣ್ಣಿಗೆ ರಾಸಾಯನಿಕ ಅಥವಾ ನುಂಗಿದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
+            f"1. ಕೀಟನಾಶಕ ಗುರುತು: {name}\n2. ಸಕ್ರಿಯ ಪದಾರ್ಥಗಳು: {active}\n3. ದುಷ್ಪರಿಣಾಮಗಳು: {side_effects}\n"
+            f"4. ಮೊದಲ ನೆರವು: {details.get('first_aid')}\n"
+            f"5. ಸುರಕ್ಷತೆ: {'; '.join(details.get('safety_precautions', []))}\n6. ಸ್ವಚ್ಛತೆ: {'; '.join(details.get('decontamination_steps', []))}\n"
+            "7. ತುರ್ತು ಸಲಹೆ: ಉಸಿರಾಟ ತೊಂದರೆ, ಮೂರ್ಛೆ, ತೀವ್ರ ವಾಂತಿ, ಕಣ್ಣಿಗೆ ರಾಸಾಯನಿಕ ಅಥವಾ ನುಂಗಿದರೆ ತಕ್ಷಣ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ."
             f"{note}"
         )
     return (
         f"1. Pesticide Identification: {name}\n"
         f"2. Active Ingredients: {active}\n"
-        f"3. Danger Level: {danger}\n"
-        f"4. Toxicity Category: {category}\n"
-        f"5. Side Effects: {side_effects}\n"
-        f"6. First Aid: {details.get('first_aid')}\n"
-        f"7. Safety Tips: {'; '.join(details.get('safety_precautions', []))}\n"
-        f"8. Decontamination: {'; '.join(details.get('decontamination_steps', []))}\n"
-        f"9. Environmental Impact: {details.get('environmental_impact')}\n"
-        "10. Emergency Recommendation: Go to hospital for breathing trouble, fainting, severe vomiting, eye exposure, or swallowing pesticide."
+        f"3. Side Effects: {side_effects}\n"
+        f"4. First Aid: {details.get('first_aid')}\n"
+        f"5. Safety Tips: {'; '.join(details.get('safety_precautions', []))}\n"
+        f"6. Decontamination: {'; '.join(details.get('decontamination_steps', []))}\n"
+        f"7. Environmental Impact: {details.get('environmental_impact')}\n"
+        "8. Emergency Recommendation: Go to hospital for breathing trouble, fainting, severe vomiting, eye exposure, or swallowing pesticide."
         f"{note}"
     )
 if __name__ == "__main__":
